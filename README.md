@@ -3,6 +3,7 @@
 [![PyPI](https://img.shields.io/pypi/v/dbckit)](https://pypi.org/project/dbckit/)
 [![CI](https://github.com/canforge/dbckit/actions/workflows/ci.yml/badge.svg)](https://github.com/canforge/dbckit/actions/workflows/ci.yml)
 [![Python versions](https://img.shields.io/pypi/pyversions/dbckit)](https://pypi.org/project/dbckit/)
+[![Downloads](https://static.pepy.tech/badge/dbckit)](https://pepy.tech/project/dbckit)
 [![License: MIT](https://img.shields.io/pypi/l/dbckit)](LICENSE)
 
 `dbckit` is a Python library for working with **DBC (CAN database) files**.
