@@ -19,6 +19,11 @@ Before tagging a release:
 
 ## Steps
 
+Publishing is tag-driven: pushing a `v*` tag triggers
+`.github/workflows/release.yml`, which builds the sdist and wheel and uploads
+them to PyPI via [trusted publishing](https://docs.pypi.org/trusted-publishers/)
+(OIDC, GitHub environment `pypi`) — no API tokens are involved.
+
 ```bash
 # 1. Bump version
 #    Edit pyproject.toml: version = "1.0.0"
@@ -28,19 +33,15 @@ Before tagging a release:
 # 3. Commit the release
 git add pyproject.toml CHANGELOG.md
 git commit -m "chore: release 1.0.0"
+git push origin main
 
-# 4. Tag
+# 4. Tag — this triggers the release workflow
 git tag -a v1.0.0 -m "Release 1.0.0"
-git push origin main --tags
+git push origin v1.0.0
 
-# 5. Build
-pip install build
-python -m build
-# Produces dist/dbckit-1.0.0.tar.gz and dist/dbckit-1.0.0-py3-none-any.whl
-
-# 6. Publish to PyPI
-pip install twine
-twine upload dist/dbckit-1.0.0*
+# 5. Verify
+gh run watch                        # release workflow builds and publishes
+open https://pypi.org/project/dbckit/
 ```
 
 ## CHANGELOG format

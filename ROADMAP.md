@@ -5,16 +5,16 @@ publish work below and the deferred feature list.
 
 ## Publish 1.0.0 to PyPI
 
-- [ ] **1. Add `.github/workflows/release.yml`**: trigger on `v*` tags; build sdist + wheel;
+- [x] **1. Add `.github/workflows/release.yml`**: trigger on `v*` tags; build sdist + wheel;
   publish with `pypa/gh-action-pypi-publish` using OIDC (`permissions: id-token: write`,
   environment `pypi`) — no API tokens
-- [ ] **2. Register the trusted publisher on pypi.org** *(manual)*: add a *pending publisher*
+- [x] **2. Register the trusted publisher on pypi.org** *(manual)*: add a *pending publisher*
   under your PyPI account for `canforge/dbckit`, workflow `release.yml`, environment `pypi`
 - [ ] **3. Optional TestPyPI dry run**: point the workflow (or a copy) at TestPyPI, publish,
   `pip install -i https://test.pypi.org/simple/ dbckit`
-- [ ] **4. Update [docs/releasing.md](docs/releasing.md)**: replace the manual twine steps with
+- [x] **4. Update [docs/releasing.md](docs/releasing.md)**: replace the manual twine steps with
   the tag-driven workflow
-- [ ] **5. Merge to `main` and push**
+- [x] **5. Merge to `main` and push**
 - [ ] **6. Tag and release**: `git tag -a v1.0.0 -m "Release 1.0.0" && git push origin v1.0.0` —
   the workflow builds and publishes
 - [ ] **7. Verify the release**
