@@ -36,3 +36,6 @@ Nonblocking; decide per item whether it lands in a 1.x release:
 - [ ] Opt-in `GenSigStartValue` encoding defaults
 - [ ] `codegen` C target remains experimental (decode stubs only) — keep it labelled until
   it is production-grade
+- [ ] Replace the deprecated `typer[rich]` extra with `typer` + explicit `rich` in the `cli`
+  and `dev` dependency groups — modern typer bundles rich, and the extra now emits an
+  install warning
