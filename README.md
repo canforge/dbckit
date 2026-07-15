@@ -20,6 +20,7 @@ Use it to:
 <p align="center">
   <img src="https://raw.githubusercontent.com/canforge/dbckit/main/docs/assets/signal-layout.svg" alt="dbckit signal layout rendering a colored bit grid of the VehicleSpeed message in the terminal" width="620">
 </p>
+<p align="center"><em>Output of <code>dbckit signal layout</code> — per-signal colored bit grid of a message.</em></p>
 
 ## Install
 
