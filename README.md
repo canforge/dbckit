@@ -1,5 +1,10 @@
 # dbckit
 
+[![PyPI](https://img.shields.io/pypi/v/dbckit)](https://pypi.org/project/dbckit/)
+[![CI](https://github.com/canforge/dbckit/actions/workflows/ci.yml/badge.svg)](https://github.com/canforge/dbckit/actions/workflows/ci.yml)
+[![Python versions](https://img.shields.io/pypi/pyversions/dbckit)](https://pypi.org/project/dbckit/)
+[![License: MIT](https://img.shields.io/pypi/l/dbckit)](LICENSE)
+
 `dbckit` is a Python library for working with **DBC (CAN database) files**.
 
 Use it to:
@@ -11,6 +16,10 @@ Use it to:
 - apply deterministic edits and write the result back out
 - diff, merge, extract, and search databases
 - decode CAN log files (`.asc` built in, extensible readers) and in-memory frame streams
+
+<p align="center">
+  <img src="docs/assets/signal-layout.svg" alt="dbckit signal layout rendering a colored bit grid of the VehicleSpeed message in the terminal" width="620">
+</p>
 
 ## Install
 
