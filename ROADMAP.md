@@ -15,13 +15,13 @@ publish work below and the deferred feature list.
 - [x] **4. Update [docs/releasing.md](docs/releasing.md)**: replace the manual twine steps with
   the tag-driven workflow
 - [x] **5. Merge to `main` and push**
-- [ ] **6. Tag and release**: `git tag -a v1.0.0 -m "Release 1.0.0" && git push origin v1.0.0` —
+- [x] **6. Tag and release**: `git tag -a v1.0.0 -m "Release 1.0.0" && git push origin v1.0.0` —
   the workflow builds and publishes
-- [ ] **7. Verify the release**
-  - [ ] In a clean venv: `pip install dbckit` then
+- [x] **7. Verify the release**
+  - [x] In a clean venv: `pip install dbckit` then
     `python -c "import dbckit; print(dbckit.parse('VERSION \"1\"').version)"`
-  - [ ] `pip install "dbckit[cli]"` and run `dbckit --help`
-  - [ ] PyPI page shows license, links, and README correctly
+  - [x] `pip install "dbckit[cli]"` and run `dbckit --help`
+  - [x] PyPI page shows license, links, and README correctly
 
 ## Deferred additions
 
