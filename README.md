@@ -18,7 +18,7 @@ Use it to:
 - decode CAN log files (`.asc` built in, extensible readers) and in-memory frame streams
 
 <p align="center">
-  <img src="docs/assets/signal-layout.svg" alt="dbckit signal layout rendering a colored bit grid of the VehicleSpeed message in the terminal" width="620">
+  <img src="https://raw.githubusercontent.com/canforge/dbckit/main/docs/assets/signal-layout.svg" alt="dbckit signal layout rendering a colored bit grid of the VehicleSpeed message in the terminal" width="620">
 </p>
 
 ## Install
