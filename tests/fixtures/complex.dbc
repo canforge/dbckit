@@ -1,0 +1,57 @@
+VERSION "2.0"
+
+NS_ :
+
+BS_ :
+
+BU_ : VehicleECU BodyControl Instrument Gateway
+
+VAL_TABLE_ IgnitionStates 0 "Off" 1 "Acc" 2 "On" 3 "Start" ;
+
+BO_ 100 VehicleSpeed: 8 VehicleECU
+ SG_ Speed : 0|16@1+ (0.01,0) [0|655.35] "km/h" Instrument,Gateway
+ SG_ Acceleration : 16|12@1- (0.01,-20) [-20|20.47] "m/s2" Gateway
+ SG_ BrakeActive : 28|1@1+ (1,0) [0|1] "" BodyControl,Gateway
+ SG_ SteeringAngle : 32|16@1- (0.1,-3276.8) [-3276.8|3276.7] "deg" Gateway
+
+BO_ 200 BodyStatus: 4 BodyControl
+ SG_ MuxSelector M : 0|4@1+ (1,0) [0|15] "" VehicleECU
+ SG_ LightStatus m0 : 4|8@1+ (1,0) [0|255] "" VehicleECU,Instrument
+ SG_ DoorStatus m1 : 4|8@1+ (1,0) [0|255] "" VehicleECU
+ SG_ WindowStatus m2 : 4|8@1+ (1,0) [0|255] "" VehicleECU
+
+BO_ 300 EngineControl: 8 Gateway
+ SG_ ThrottlePos : 0|8@1+ (0.392157,0) [0|100] "%" VehicleECU
+ SG_ RPMTarget : 8|16@1+ (1,0) [0|8000] "rpm" VehicleECU
+ SG_ EngineMode : 24|4@1+ (1,0) [0|15] "" VehicleECU
+ SG_ FuelPressure : 39|10@0+ (0.1,0) [0|102.3] "bar" VehicleECU
+
+CM_ BO_ 100 "Vehicle dynamics data";
+CM_ BO_ 200 "Body control multiplexed message";
+CM_ SG_ 100 Speed "Vehicle speed over ground";
+CM_ SG_ 200 MuxSelector "Selects the active sub-message";
+CM_ BU_ VehicleECU "Main vehicle ECU";
+CM_ BU_ BodyControl "Body control module";
+
+BA_DEF_ BO_  "GenMsgCycleTime" INT 0 10000;
+BA_DEF_ BO_  "GenMsgSendType" ENUM "NoMsgSendType","Cyclic","Event","CyclicOrEvent";
+BA_DEF_ SG_  "InitialValue" FLOAT 0 100;
+BA_DEF_ SG_  "Factor" FLOAT 0 100;
+BA_DEF_  "DBVersion" STRING;
+
+BA_DEF_DEF_  "GenMsgCycleTime" 0;
+BA_DEF_DEF_  "GenMsgSendType" "NoMsgSendType";
+BA_DEF_DEF_  "InitialValue" 0;
+BA_DEF_DEF_  "Factor" 1;
+BA_DEF_DEF_  "DBVersion" "";
+
+BA_ "GenMsgCycleTime" BO_ 100 10;
+BA_ "GenMsgCycleTime" BO_ 200 20;
+BA_ "GenMsgSendType" BO_ 100 "Cyclic";
+BA_ "DBVersion" "2.0.0";
+
+VAL_ 100 BrakeActive 0 "Released" 1 "Pressed" ;
+VAL_ 300 EngineMode 0 "Normal" 1 "Sport" 2 "Eco" 3 "Custom" ;
+
+SIG_GROUP_ 100 DynamicsGroup 1 : Speed Acceleration BrakeActive ;
+

@@ -1,0 +1,117 @@
+// DBC file grammar for Lark (Earley parser, dynamic lexer)
+// Covers the full DBC specification including real-world quirks
+
+start: section*
+
+section: version_section
+       | ns_section
+       | bs_section
+       | bu_section
+       | val_table_section
+       | message_section
+       | message_transmitters_section
+       | sig_group_section
+       | comment_section
+       | attr_def_section
+       | attr_def_default_section
+       | attr_val_section
+       | val_section
+       | sig_valtype_section
+       | envvar_section
+       | envvar_data_section
+
+// ── VERSION ────────────────────────────────────────────────────────────────
+version_section: "VERSION" STRING
+
+// ── NS_ ────────────────────────────────────────────────────────────────────
+ns_section: "NS_" ":" CNAME*
+
+// ── BS_ ────────────────────────────────────────────────────────────────────
+bs_section: "BS_" ":" bit_timing?
+bit_timing: INT ":" INT "," INT
+
+// ── BU_ ────────────────────────────────────────────────────────────────────
+bu_section: "BU_" ":" CNAME*
+
+// ── VAL_TABLE_ ─────────────────────────────────────────────────────────────
+val_table_section: "VAL_TABLE_" CNAME (INT STRING)* ";"
+
+// ── BO_ message ────────────────────────────────────────────────────────────
+message_section: "BO_" INT CNAME ":" INT CNAME signal_section*
+
+signal_section: "SG_" CNAME mux_indicator? ":" signal_def
+
+mux_indicator: MUX_TOKEN
+
+signal_def: INT "|" INT "@" BIT_ORDER_SIGN "(" NUMBER "," NUMBER ")" "[" NUMBER "|" NUMBER "]" STRING receiver_list
+
+receiver_list: CNAME ("," CNAME)*
+
+BIT_ORDER_SIGN.2: /[01][+-]/
+MUX_TOKEN.2: /M|m[0-9]+M?/
+
+// ── BO_TX_BU_ message transmitters ────────────────────────────────────────
+message_transmitters_section: "BO_TX_BU_" INT ":" CNAME ("," CNAME)* ";"
+
+// ── SIG_GROUP_ ─────────────────────────────────────────────────────────────
+sig_group_section: "SIG_GROUP_" INT CNAME INT ":" CNAME* ";"
+
+// ── CM_ comments ──────────────────────────────────────────────────────────
+comment_section: "CM_" "BO_" INT STRING ";"        -> msg_comment
+               | "CM_" "SG_" INT CNAME STRING ";"  -> sig_comment
+               | "CM_" "BU_" CNAME STRING ";"      -> node_comment
+               | "CM_" "EV_" CNAME STRING ";"      -> envvar_comment
+               | "CM_" STRING ";"                  -> db_comment
+
+// ── BA_DEF_ attribute definitions ─────────────────────────────────────────
+attr_def_section: "BA_DEF_" "BU_" STRING attr_value_type ";" -> attr_def_bu
+                | "BA_DEF_" "BO_" STRING attr_value_type ";" -> attr_def_bo
+                | "BA_DEF_" "SG_" STRING attr_value_type ";" -> attr_def_sg
+                | "BA_DEF_" "EV_" STRING attr_value_type ";" -> attr_def_ev
+                | "BA_DEF_" STRING attr_value_type ";"       -> attr_def_db
+
+attr_value_type: "INT" NUMBER NUMBER          -> attr_int
+               | "HEX" NUMBER NUMBER          -> attr_hex
+               | "FLOAT" NUMBER NUMBER        -> attr_float
+               | "STRING"                     -> attr_string
+               | "ENUM" STRING ("," STRING)*  -> attr_enum
+
+// ── BA_DEF_DEF_ attribute defaults ────────────────────────────────────────
+attr_def_default_section: "BA_DEF_DEF_" STRING NUMBER ";" -> attr_def_def_num
+                         | "BA_DEF_DEF_" STRING STRING ";" -> attr_def_def_str
+
+// ── BA_ attribute values ──────────────────────────────────────────────────
+attr_val_section: "BA_" STRING "BU_" CNAME NUMBER ";"          -> attr_val_node_num
+                | "BA_" STRING "BU_" CNAME STRING ";"          -> attr_val_node_str
+                | "BA_" STRING "BO_" INT NUMBER ";"            -> attr_val_msg_num
+                | "BA_" STRING "BO_" INT STRING ";"            -> attr_val_msg_str
+                | "BA_" STRING "SG_" INT CNAME NUMBER ";"      -> attr_val_sig_num
+                | "BA_" STRING "SG_" INT CNAME STRING ";"      -> attr_val_sig_str
+                | "BA_" STRING "EV_" CNAME NUMBER ";"          -> attr_val_env_num
+                | "BA_" STRING "EV_" CNAME STRING ";"          -> attr_val_env_str
+                | "BA_" STRING NUMBER ";"                      -> attr_val_db_num
+                | "BA_" STRING STRING ";"                      -> attr_val_db_str
+
+// ── VAL_ value descriptions ────────────────────────────────────────────────
+val_section: "VAL_" INT CNAME (INT STRING)* ";" -> signal_val
+           | "VAL_" CNAME (INT STRING)* ";"     -> table_val
+
+// ── SIG_VALTYPE_ ──────────────────────────────────────────────────────────
+sig_valtype_section: "SIG_VALTYPE_" INT CNAME ":" INT ";"
+
+// ── EV_ environment variables ─────────────────────────────────────────────
+envvar_section: "EV_" CNAME ":" INT "[" NUMBER "|" NUMBER "]" STRING NUMBER INT CNAME CNAME ("," CNAME)* ";"
+
+// ── ENVVAR_DATA_ ──────────────────────────────────────────────────────────
+envvar_data_section: "ENVVAR_DATA_" CNAME ":" INT ";"
+
+// ── Terminals ─────────────────────────────────────────────────────────────
+STRING: "\"" /[^"]*/ "\""
+INT.1: /[0-9]+/
+NUMBER: /[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?/
+CNAME: /[A-Za-z_][A-Za-z0-9_]*/
+
+%import common.WS
+%ignore WS
+%ignore /\/\/.*/
+%ignore /\/\*(.|\n)*?\*\//

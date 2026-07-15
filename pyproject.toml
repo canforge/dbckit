@@ -1,0 +1,78 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dbckit"
+version = "1.0.0"
+description = "A Python library for working with DBC (CAN database) files"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "André Delgado", email = "andre@adelgado.io" }]
+keywords = ["CAN", "DBC", "automotive", "canbus"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+    "pydantic>=2.0",
+    "lark>=1.1",
+]
+
+[project.urls]
+Homepage = "https://canforge.io/dbckit"
+Repository = "https://github.com/canforge/dbckit"
+Changelog = "https://github.com/canforge/dbckit/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+cli = ["typer[rich]>=0.9"]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+    "typer[rich]>=0.9",
+]
+
+[project.scripts]
+dbckit = "dbckit.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["dbckit"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--tb=short"
+
+[tool.coverage.run]
+source = ["dbckit"]
+omit = ["dbckit/cli.py"]   # CLI coverage measured separately via test_cli.py
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+no_strict_optional = true
+warn_unused_ignores = false
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]

@@ -1,0 +1,15 @@
+VERSION ""
+
+NS_ :
+
+BS_ :
+
+BU_ : ECU1 ECU2
+
+BO_ 2147483904 ExtMsg: 8 ECU1
+ SG_ ExtSig : 0|16@1+ (0.1,0) [0|100] "kph" ECU2
+
+BO_ 512 StdMsg: 4 ECU1
+ SG_ StdSig : 0|8@1+ (1,0) [0|255] "" ECU2
+
+BO_TX_BU_ 512 : ECU1,ECU2;

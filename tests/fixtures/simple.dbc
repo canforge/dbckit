@@ -1,0 +1,52 @@
+VERSION "1.0"
+
+NS_ :
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+
+BS_ :
+
+BU_ : ECU1 ECU2 GW
+
+BO_ 500 EngineData: 8 ECU1
+ SG_ EngineSpeed : 0|16@1+ (0.1,0) [0|6553.5] "rpm" ECU2,GW
+ SG_ EngineTemp : 16|8@1+ (1,-40) [0|215] "degC" ECU2
+ SG_ IgnitionStatus : 24|1@1+ (1,0) [0|1] "" ECU2,GW
+
+BO_ 768 TransmissionData: 4 ECU2
+ SG_ GearPosition : 0|4@1+ (1,0) [0|15] "" ECU1,GW
+ SG_ TransmissionTemp : 4|8@1- (0.5,-50) [-50|77.5] "degC" GW
+
+CM_ BO_ 500 "Engine status message";
+CM_ SG_ 500 EngineSpeed "Current engine speed in RPM";
+CM_ SG_ 500 EngineTemp "Engine coolant temperature";
+CM_ BU_ ECU1 "Engine control unit";
+
+BA_DEF_ BO_  "GenMsgCycleTime" INT 0 10000;
+BA_DEF_ SG_  "SystemSignalLongSymbol" STRING;
+
+BA_DEF_DEF_  "GenMsgCycleTime" 0;
+BA_DEF_DEF_  "SystemSignalLongSymbol" "";
+
+BA_ "GenMsgCycleTime" BO_ 500 100;
+BA_ "GenMsgCycleTime" BO_ 768 50;
+
+VAL_ 500 IgnitionStatus 0 "Off" 1 "On" ;
+VAL_ 768 GearPosition 0 "Park" 1 "Reverse" 2 "Neutral" 3 "Drive" ;
+
