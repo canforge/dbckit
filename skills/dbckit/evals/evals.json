@@ -1,0 +1,26 @@
+{
+  "skill_name": "dbckit",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "edit-pipeline-copy-on-write",
+      "prompt": "You have a CAN database at vehicle.dbc (in your working directory) and the dbckit Python library is installed (use the venv python you are told about). Write and run a script that: (1) renames message 100 to SpeedData, (2) changes signal Speed's factor to 0.02, (3) adds a new node named Logger, (4) deletes the signal BrakeActive from message 100, then saves the result to vehicle.updated.dbc. Finally, reload vehicle.updated.dbc and print the message 100 name, the Speed factor, the full node list, and message 100's signal names to prove the edits persisted.",
+      "expected_output": "vehicle.updated.dbc exists and, when reloaded, message 100 is named SpeedData, Speed has factor 0.02, node Logger is present, and BrakeActive is gone. The original vehicle.dbc is unchanged.",
+      "files": ["vehicle.dbc"]
+    },
+    {
+      "id": 1,
+      "eval_name": "decode-and-validate",
+      "prompt": "Using the dbckit Python library (installed in the venv you are told about) and the CAN database vehicle.dbc in your working directory: decode the CAN frame with arbitration ID 100 and payload bytes 10 27 00 00 00 00 00 00 (hex), and report every signal's physical value. Then validate the database and report any issues found (severity, code, location). Write your findings to results.txt.",
+      "expected_output": "results.txt reports Speed = 100.0 km/h (raw 0x2710 = 10000 * factor 0.01) plus the other decoded signals (Acceleration, BrakeActive, SteeringAngle), and the validation outcome.",
+      "files": ["vehicle.dbc"]
+    },
+    {
+      "id": 2,
+      "eval_name": "cli-workflow-encode",
+      "prompt": "The dbckit CLI is installed (its bin directory will be given to you). Using ONLY the dbckit command-line tool (not Python) against vehicle.dbc in your working directory: (1) validate the database and note the exit code, (2) get the details of message 300 as JSON, (3) encode a frame for message 300 with RPMTarget=3000 and EngineMode=2 and record the hex payload. Save all three results to cli-results.txt.",
+      "expected_output": "cli-results.txt contains the validation outcome, message 300 JSON (EngineControl), and the encoded payload 00B80B0200000000.",
+      "files": ["vehicle.dbc"]
+    }
+  ]
+}

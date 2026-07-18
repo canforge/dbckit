@@ -1,7 +1,8 @@
 # Roadmap
 
 The pre-1.0 planning checklists are complete and retired; what remains is the
-publish work below and the deferred feature list.
+publish work below, the planned 1.0.1 and 1.1.0 releases, and the deferred
+feature list.
 
 ## Publish 1.0.0 to PyPI
 
@@ -23,12 +24,59 @@ publish work below and the deferred feature list.
   - [x] `pip install "dbckit[cli]"` and run `dbckit --help`
   - [x] PyPI page shows license, links, and README correctly
 
+## 1.0.1 — extended-ID reference fixes (patch)
+
+Bug fixes only, no API change. Ship first and alone: extended flagged IDs plus
+`CM_`/`BA_`/`VAL_` sections are the norm in real-world J1939 DBCs, and today such files
+cannot load at all — which pushes clients into stripping sections to work around it.
+
+- [ ] Normalize the extended-frame flag through one shared helper at every message
+  reference, not only `BO_`: `CM_`/`BA_`/`VAL_`/`SIG_VALTYPE_` look up messages by the
+  raw flagged ID and fail, `BO_TX_BU_` silently drops senders, `SIG_GROUP_` stores the
+  unmasked ID, and the `CM_ BO_` handler writes back under the raw key (would duplicate
+  messages once lookups alone were fixed)
+- [ ] Serialize the flagged ID consistently in every section, not only `BO_`, so emitted
+  files round-trip and match what other tools expect
+- [ ] Accept the bare `SG_MUL_VAL_` token inside `NS_:`; reject only an actual statement
+  (has arguments). Real extended multiplexing is already rejected at the signal level,
+  so the line-based pre-scan may shrink to nothing
+- [ ] Regression fixture: a CSS-Electronics-shaped DBC (extended flagged IDs,
+  `CM_`/`BA_`/`VAL_`/`SIG_VALTYPE_` referencing them, `SG_MUL_VAL_` in `NS_`) exercised
+  in the round-trip suite — the single test that would have caught all of the above
+- [ ] Keep signal groups consistent through signal mutations: `delete_signal` leaves the
+  deleted name dangling in `SIG_GROUP_` membership and `rename_signal` leaves the old
+  name behind, even though `add_signal_group` validates members and `delete_message`
+  already prunes groups. Fix both mutations, and add validator checks that each group's
+  `message_id` exists and its `signal_names` are members of that message — today the
+  validator has no signal-group checks, so the dangling name round-trips into emitted
+  DBC text undetected
+
+## 1.1.0 — lenient parsing and J1939 matching (minor)
+
+Depends on 1.0.1: the `PGN`/`ProtocolType` attributes that drive J1939 auto-detection
+live in exactly the `BA_` lines that currently fail to parse on extended-ID files.
+
+- [ ] Lenient parsing with diagnostics: `parse(text, on_unsupported="raise" | "skip")`,
+  default `"raise"` so 1.0 behavior is unchanged. Each skipped construct or dangling
+  reference records a structured diagnostic (construct, line, affected message/signal,
+  `effect: decode_degraded | cosmetic`); decode-safety is tracked per message with a
+  derived global rollup, and lenient mode never silently alters decode semantics.
+  Subsumes the previously deferred `errors="collect"` lenient load mode item.
+- [ ] J1939 PGN-aware message resolution: `decode_frames(..., match="exact" | "j1939" |
+  "auto")`. PGN is derived from the 29-bit arbitration ID (PDU1/PDU2 handling, source
+  address ignored); the `BA_` `PGN`/`ProtocolType` attributes serve only as the
+  auto-detection signal; ambiguous PGN matches are returned explicitly. Pure ID math
+  stays in dependency-free functions in `operations/j1939.py` — the extraction seam if
+  transport protocol or DM diagnostics ever justify a separate j1939kit.
+- [ ] Timeboxed: try `parser="lalr"` in place of Earley. A cold parse of a 1,900-message
+  / 13,000-signal DBC measures ~10 s and scales linearly; LALR is behavior-neutral if
+  the grammar is compatible, and the 1.0.1 round-trip suite verifies it. Defer without
+  guilt if the grammar resists.
+
 ## Deferred additions
 
 Nonblocking; decide per item whether it lands in a 1.x release:
 
-- [ ] Lenient load mode (`errors="collect"`): recover from dangling references and record
-  them as parse issues instead of failing — the main friction point on real-world OEM files
 - [ ] Built-in candump reader (other formats can already integrate through `dbckit.readers`)
 - [ ] Free-slot layout helper and opt-in overlap checking during `add_signal`
 - [ ] Sorted serialization via a `sort=` option
@@ -39,3 +87,8 @@ Nonblocking; decide per item whether it lands in a 1.x release:
 - [ ] Replace the deprecated `typer[rich]` extra with `typer` + explicit `rich` in the `cli`
   and `dev` dependency groups — modern typer bundles rich, and the extra now emits an
   install warning
+- [ ] Guard the agent skill's bundled docs against drift: `skills/dbckit/references/` holds
+  verbatim copies of `docs/{api-reference,cli,dbc-support}.md` so agents get local,
+  version-coherent reads. Add a `scripts/sync_skill_refs.sh` (plain `cp`) plus a CI step
+  that `diff -r`s the two locations, so a PR touching docs without re-syncing fails; add
+  a "Canonical source + version" header line to each bundled copy
