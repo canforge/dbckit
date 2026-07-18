@@ -289,6 +289,32 @@ def test_extended_frame_constructed_roundtrip():
     assert db2.messages[0x18FF1234].arbitration_id == 0x18FF1234
 
 
+def test_css_electronics_extended_id_fixture_roundtrip():
+    original = dbckit.load(FIXTURES / "css_electronics_extended.dbc").model_copy(
+        update={"filename": None}
+    )
+    flagged_id = 2364540158
+
+    serialized = dbckit.dump(original)
+
+    expected_id_references = (
+        f"BO_ {flagged_id} EngineTelemetry:",
+        f"BO_TX_BU_ {flagged_id} :",
+        f"CM_ BO_  {flagged_id} ",
+        f"CM_ SG_  {flagged_id} EngineSpeed ",
+        f'BA_ "VFrameFormat" BO_ {flagged_id} ',
+        f'BA_ "SPN" SG_ {flagged_id} EngineSpeed ',
+        f"VAL_ {flagged_id} EngineStatus ",
+        f"SIG_GROUP_ {flagged_id} EngineSignals ",
+        f"SIG_VALTYPE_ {flagged_id} EngineSpeed ",
+    )
+    for expected in expected_id_references:
+        assert expected in serialized
+
+    reparsed = dbckit.parse(serialized)
+    assert reparsed == original
+
+
 # ── BO_TX_BU_ ─────────────────────────────────────────────────────────────────
 
 def test_bo_tx_bu_emitted_for_multiple_senders():

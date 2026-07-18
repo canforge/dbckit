@@ -40,7 +40,7 @@ cannot load at all — which pushes clients into stripping sections to work arou
 - [x] Accept the bare `SG_MUL_VAL_` token inside `NS_:`; reject only an actual statement
   (has arguments). Real extended multiplexing is already rejected at the signal level,
   so the line-based pre-scan may shrink to nothing
-- [ ] Regression fixture: a CSS-Electronics-shaped DBC (extended flagged IDs,
+- [x] Regression fixture: a CSS-Electronics-shaped DBC (extended flagged IDs,
   `CM_`/`BA_`/`VAL_`/`SIG_VALTYPE_` referencing them, `SG_MUL_VAL_` in `NS_`) exercised
   in the round-trip suite — the single test that would have caught all of the above
 - [ ] Keep signal groups consistent through signal mutations: `delete_signal` leaves the
