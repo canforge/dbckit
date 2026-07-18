@@ -79,10 +79,15 @@ def change_arbitration_id(db: Database, old_id: int, new_id: int) -> Database:
 
 
 def delete_message(db: Database, arbitration_id: int) -> Database:
-    """Return a new Database with the specified message removed."""
+    """Return a new Database with the message and its signal groups removed."""
     _get(db, arbitration_id)
     new_messages = {k: v for k, v in db.messages.items() if k != arbitration_id}
-    return db.model_copy(update={"messages": new_messages})
+    signal_groups = [
+        group for group in db.signal_groups if group.message_id != arbitration_id
+    ]
+    return db.model_copy(
+        update={"messages": new_messages, "signal_groups": signal_groups}
+    )
 
 
 def rename_message(db: Database, arbitration_id: int, new_name: str) -> Database:

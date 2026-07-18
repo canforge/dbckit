@@ -43,13 +43,12 @@ cannot load at all — which pushes clients into stripping sections to work arou
 - [x] Regression fixture: a CSS-Electronics-shaped DBC (extended flagged IDs,
   `CM_`/`BA_`/`VAL_`/`SIG_VALTYPE_` referencing them, `SG_MUL_VAL_` in `NS_`) exercised
   in the round-trip suite — the single test that would have caught all of the above
-- [ ] Keep signal groups consistent through signal mutations: `delete_signal` leaves the
-  deleted name dangling in `SIG_GROUP_` membership and `rename_signal` leaves the old
-  name behind, even though `add_signal_group` validates members and `delete_message`
-  already prunes groups. Fix both mutations, and add validator checks that each group's
-  `message_id` exists and its `signal_names` are members of that message — today the
-  validator has no signal-group checks, so the dangling name round-trips into emitted
-  DBC text undetected
+- [x] Keep signal groups consistent through signal and message mutations:
+  `delete_signal` prunes the deleted name, `rename_signal` rewrites the old name,
+  `delete_message` prunes the message's groups, and `update_signal` rejects name changes
+  in favor of `rename_signal`. Validate that each group's `message_id` exists and its
+  `signal_names` belong to that message so dangling references cannot round-trip into
+  emitted DBC text undetected.
 
 ## 1.1.0 — lenient parsing and J1939 matching (minor)
 

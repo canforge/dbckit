@@ -6,7 +6,7 @@ from pathlib import Path
 import dbckit
 from dbckit.model.database import AttributeDefinition, AttributeKind, Database, Issue
 from dbckit.model.message import Message
-from dbckit.model.signal import ByteOrder, Signal
+from dbckit.model.signal import ByteOrder, Signal, SignalGroup
 from dbckit.validator import validate
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -172,6 +172,62 @@ def test_missing_receiver():
     db = Database(version="", messages={1: msg})
     codes = [i.code for i in validate(db)]
     assert "MISSING_RECEIVER" in codes
+
+
+def test_signal_group_message_must_exist():
+    group = SignalGroup(name="Dangling", message_id=0x123, signal_names=["Ghost"])
+    db = Database(signal_groups=[group])
+
+    issues = validate(db)
+
+    matching = [i for i in issues if i.code == "SIGNAL_GROUP_MISSING_MESSAGE"]
+    assert len(matching) == 1
+    assert matching[0].severity == "error"
+    assert matching[0].location == "signal-group:0x123:Dangling"
+    assert validate(db, strict=True) == issues
+
+
+def test_signal_group_members_must_belong_to_message():
+    signal = Signal(name="Present", start_bit=0, length=8)
+    msg = Message(
+        arbitration_id=0x123,
+        name="Message",
+        length=8,
+        signals={"Present": signal},
+    )
+    group = SignalGroup(
+        name="Members",
+        message_id=0x123,
+        signal_names=["Present", "Ghost"],
+    )
+
+    issues = validate(Database(messages={0x123: msg}, signal_groups=[group]))
+
+    matching = [i for i in issues if i.code == "SIGNAL_GROUP_MISSING_SIGNAL"]
+    assert len(matching) == 1
+    assert matching[0].severity == "error"
+    assert "Ghost" in matching[0].message
+
+
+def test_valid_signal_group_has_no_group_issues():
+    signal = Signal(name="Present", start_bit=0, length=8)
+    msg = Message(
+        arbitration_id=0x123,
+        name="Message",
+        length=8,
+        signals={"Present": signal},
+    )
+    group = SignalGroup(
+        name="Members", message_id=0x123, signal_names=["Present"]
+    )
+
+    codes = [
+        i.code
+        for i in validate(Database(messages={0x123: msg}, signal_groups=[group]))
+    ]
+
+    assert "SIGNAL_GROUP_MISSING_MESSAGE" not in codes
+    assert "SIGNAL_GROUP_MISSING_SIGNAL" not in codes
 
 
 def test_issue_is_pydantic_model():

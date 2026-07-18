@@ -388,7 +388,7 @@ Updates selected message fields.
 
 #### `MessageView.delete() -> Database`
 
-Deletes the current message.
+Deletes the current message and its signal groups.
 
 #### `MessageView.rename(new_name: str) -> Database`
 
@@ -421,17 +421,22 @@ Raises:
 
 #### `MessageView.delete_signal(name: str) -> Database`
 
-Deletes a signal from the current message.
+Deletes a signal from the current message and removes it from every signal group
+attached to that message.
 
 #### `MessageView.rename_signal(old_name: str, new_name: str) -> Database`
 
-Renames a signal in the current message.
+Renames a signal in the current message and updates its name in every signal group
+attached to that message.
 
 Raises `ValueError` if `new_name` belongs to another signal in the message.
 
 #### `MessageView.update_signal(name: str, **fields) -> Database`
 
 Updates selected fields on a signal in the current message.
+
+Passing `name` raises `ValueError`; use `rename_signal()` so signal-group
+memberships are updated atomically.
 
 #### `MessageView.set_attribute(name: str, value: Any) -> Database`
 
@@ -487,17 +492,16 @@ Existing-entity edits:
 
 Updates selected signal fields.
 
+Passing `name` raises `ValueError`; use `rename()` instead.
+
 #### `SignalView.delete() -> Database`
 
 Deletes the current signal.
 
 #### `SignalView.rename(new_name: str) -> Database`
 
-Renames the current signal.
-
-Important:
-
-- current implementation does not reject collisions with an existing `new_name`
+Renames the current signal and updates its name in every signal group attached to
+the message. Raises `ValueError` if `new_name` belongs to another signal.
 
 #### `SignalView.add_choice(value: int, label: str) -> Database`
 
@@ -657,6 +661,8 @@ Current checks:
 - undefined attributes
 - numeric attribute range violations
 - enum attribute value violations
+- signal groups that reference missing messages
+- signal-group members that do not belong to the referenced message
 
 Behavior:
 
@@ -678,6 +684,8 @@ Known issue codes:
 - `MISSING_RECEIVER`
 - `ATTR_UNDEFINED`
 - `ATTR_OUT_OF_RANGE`
+- `SIGNAL_GROUP_MISSING_MESSAGE`
+- `SIGNAL_GROUP_MISSING_SIGNAL`
 
 ## Codec
 

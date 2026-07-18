@@ -316,6 +316,7 @@ def test_css_electronics_extended_id_fixture_roundtrip():
     )
     for expected in expected_id_references:
         assert expected in serialized
+    assert str(extended_id) not in serialized
 
     expected_standard_id_references = (
         f"BO_ {standard_id} StandardStatus:",

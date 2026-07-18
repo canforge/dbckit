@@ -9,6 +9,7 @@ def validate(db: Database, strict: bool = False) -> list[Issue]:
     """Return all Issues found in *db*. If *strict*, warnings become errors."""
     issues: list[Issue] = []
     issues.extend(_check_messages(db))
+    issues.extend(_check_signal_groups(db))
     issues.extend(_check_attributes(db))
     if strict:
         for i, iss in enumerate(issues):
@@ -33,6 +34,10 @@ def _loc_node(name: str) -> str:
 
 def _loc_attr(name: str) -> str:
     return f"attribute:{name}"
+
+
+def _loc_signal_group(message_id: int, name: str) -> str:
+    return f"signal-group:{message_id:#x}:{name}"
 
 
 def _mux_index(indicator: str | None) -> int | None:
@@ -171,6 +176,41 @@ def _check_messages(db: Database) -> list[Issue]:
                     ))
                 else:
                     usage[bit] = sig.name
+
+    return issues
+
+
+# ── signal-group checks ──────────────────────────────────────────────────────
+
+def _check_signal_groups(db: Database) -> list[Issue]:
+    issues: list[Issue] = []
+
+    for group in db.signal_groups:
+        loc = _loc_signal_group(group.message_id, group.name)
+        msg = db.messages.get(group.message_id)
+        if msg is None:
+            issues.append(Issue(
+                severity="error",
+                code="SIGNAL_GROUP_MISSING_MESSAGE",
+                location=loc,
+                message=(
+                    f"Signal group '{group.name}' references missing message "
+                    f"{group.message_id:#x}."
+                ),
+            ))
+            continue
+
+        for signal_name in group.signal_names:
+            if signal_name not in msg.signals:
+                issues.append(Issue(
+                    severity="error",
+                    code="SIGNAL_GROUP_MISSING_SIGNAL",
+                    location=loc,
+                    message=(
+                        f"Signal group '{group.name}' references missing signal "
+                        f"'{signal_name}' in message '{msg.name}'."
+                    ),
+                ))
 
     return issues
 

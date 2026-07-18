@@ -21,6 +21,9 @@ Versioning follows [Semantic Versioning](https://semver.org/) from 1.0.0 onward.
 - Accept the bare `SG_MUL_VAL_` capability token inside `NS_` and preserve it
   across round trips, while continuing to reject extended-multiplexing range
   statements with a targeted parser error.
+- Keep signal-group membership synchronized when signals are deleted or renamed,
+  prune groups when their message is deleted, reject signal-name changes through
+  generic updates, and report dangling group references during validation.
 
 ## [1.0.0] — 2026-07-15
 

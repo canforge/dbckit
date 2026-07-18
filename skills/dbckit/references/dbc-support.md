@@ -152,6 +152,8 @@ Standard frames (`is_extended_frame=False`, default) use 11-bit IDs (0–0x7FF).
 | `MISSING_RECEIVER` | A signal receiver is not declared in `BU_` |
 | `ATTR_UNDEFINED` | An attribute value references an undefined attribute definition |
 | `ATTR_OUT_OF_RANGE` | A numeric attribute value falls outside the defined min/max |
+| `SIGNAL_GROUP_MISSING_MESSAGE` | A signal group references a message that does not exist |
+| `SIGNAL_GROUP_MISSING_SIGNAL` | A signal-group member does not exist in the referenced message |
 
 Sender and receiver references are validated by `MISSING_SENDER` and
 `MISSING_RECEIVER`; there is no separate node-validation pass.

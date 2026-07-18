@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dbckit.model.database import Database
 from dbckit.model.message import Message
-from dbckit.model.signal import BitSlot, ByteOrder, Signal, ValueTable
+from dbckit.model.signal import BitSlot, ByteOrder, Signal, SignalGroup, ValueTable
 
 
 def add_signal(db: Database, arbitration_id: int, signal: Signal) -> Database:
@@ -23,6 +23,8 @@ def update_signal(
     """Return a new Database with the specified signal fields updated."""
     msg = _get_msg(db, arbitration_id)
     sig = _get_sig(msg, signal_name)
+    if "name" in fields:
+        raise ValueError("Use rename_signal() to change a signal name.")
     updated = sig.model_copy(update=fields)
     new_signals = {**msg.signals, signal_name: updated}
     return _replace_msg(db, msg.model_copy(update={"signals": new_signals}))
@@ -31,11 +33,27 @@ def update_signal(
 def delete_signal(
     db: Database, arbitration_id: int, signal_name: str
 ) -> Database:
-    """Return a new Database with the specified signal removed."""
+    """Return a new Database with the signal removed from its message and groups."""
     msg = _get_msg(db, arbitration_id)
     _get_sig(msg, signal_name)
     new_signals = {k: v for k, v in msg.signals.items() if k != signal_name}
-    return _replace_msg(db, msg.model_copy(update={"signals": new_signals}))
+    new_groups = [
+        group.model_copy(
+            update={
+                "signal_names": [
+                    name for name in group.signal_names if name != signal_name
+                ]
+            }
+        )
+        if group.message_id == arbitration_id and signal_name in group.signal_names
+        else group
+        for group in db.signal_groups
+    ]
+    return _replace_msg_and_groups(
+        db,
+        msg.model_copy(update={"signals": new_signals}),
+        new_groups,
+    )
 
 
 def rename_signal(
@@ -58,7 +76,24 @@ def rename_signal(
         (new_name if k == signal_name else k): (renamed if k == signal_name else v)
         for k, v in msg.signals.items()
     }
-    return _replace_msg(db, msg.model_copy(update={"signals": new_signals}))
+    new_groups = [
+        group.model_copy(
+            update={
+                "signal_names": [
+                    new_name if name == signal_name else name
+                    for name in group.signal_names
+                ]
+            }
+        )
+        if group.message_id == arbitration_id and signal_name in group.signal_names
+        else group
+        for group in db.signal_groups
+    ]
+    return _replace_msg_and_groups(
+        db,
+        msg.model_copy(update={"signals": new_signals}),
+        new_groups,
+    )
 
 
 def add_signal_choice(
@@ -165,4 +200,15 @@ def _get_sig(msg: Message, name: str) -> Signal:
 def _replace_msg(db: Database, msg: Message) -> Database:
     return db.model_copy(
         update={"messages": {**db.messages, msg.arbitration_id: msg}}
+    )
+
+
+def _replace_msg_and_groups(
+    db: Database, msg: Message, signal_groups: list[SignalGroup]
+) -> Database:
+    return db.model_copy(
+        update={
+            "messages": {**db.messages, msg.arbitration_id: msg},
+            "signal_groups": signal_groups,
+        }
     )

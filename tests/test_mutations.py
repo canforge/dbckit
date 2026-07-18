@@ -73,6 +73,20 @@ class TestMessageMutations:
         assert 500 not in db2.messages
         assert 500 in db.messages
 
+    def test_delete_message_removes_its_signal_groups(self, db):
+        engine_group = SignalGroup(
+            name="Powertrain", message_id=500, signal_names=["EngineSpeed"]
+        )
+        transmission_group = SignalGroup(
+            name="Gearbox", message_id=768, signal_names=["GearPosition"]
+        )
+        grouped = add_signal_group(add_signal_group(db, engine_group), transmission_group)
+
+        changed = grouped.message(500).delete()
+
+        assert changed.signal_groups == [transmission_group]
+        assert grouped.signal_groups == [engine_group, transmission_group]
+
     def test_delete_message_missing_raises(self, db):
         with pytest.raises(KeyError):
             delete_message(db, 0xDEAD)
@@ -163,6 +177,83 @@ class TestSignalMutations:
     def test_rename_signal_same_name_is_noop(self, db):
         db2 = rename_signal(db, 500, "EngineSpeed", "EngineSpeed")
         assert "EngineSpeed" in db2.messages[500].signals
+
+    def test_update_signal_rejects_name_change(self, db):
+        with pytest.raises(ValueError, match="rename_signal"):
+            update_signal(db, 500, "EngineSpeed", name="RPM")
+        with pytest.raises(ValueError, match="rename_signal"):
+            db.message(500).signal("EngineSpeed").update(name="RPM")
+
+    def test_delete_signal_removes_signal_group_membership(self, db):
+        mixed_group = SignalGroup(
+            name="Powertrain",
+            message_id=500,
+            signal_names=["EngineSpeed", "EngineTemp"],
+        )
+        emptied_group = SignalGroup(
+            name="OnlySpeed", message_id=500, signal_names=["EngineSpeed"]
+        )
+        other_group = SignalGroup(
+            name="Gearbox", message_id=768, signal_names=["GearPosition"]
+        )
+        grouped = add_signal_group(
+            add_signal_group(add_signal_group(db, mixed_group), emptied_group),
+            other_group,
+        )
+
+        changed = delete_signal(grouped, 500, "EngineSpeed")
+
+        assert changed.signal_groups[0].signal_names == ["EngineTemp"]
+        assert changed.signal_groups[1].signal_names == []
+        assert changed.signal_groups[2] == other_group
+        assert grouped.signal_groups == [mixed_group, emptied_group, other_group]
+
+        reparsed = dbckit.parse(dbckit.dump(changed))
+        assert reparsed.signal_groups[0].signal_names == ["EngineTemp"]
+        assert reparsed.signal_groups[1].signal_names == []
+        assert "EngineSpeed" not in {
+            name for group in reparsed.signal_groups for name in group.signal_names
+        }
+
+    def test_rename_signal_updates_signal_group_membership(self, db):
+        first_group = SignalGroup(
+            name="Powertrain",
+            message_id=500,
+            signal_names=["EngineSpeed", "EngineTemp"],
+        )
+        second_group = SignalGroup(
+            name="OnlySpeed", message_id=500, signal_names=["EngineSpeed"]
+        )
+        other_group = SignalGroup(
+            name="Gearbox", message_id=768, signal_names=["GearPosition"]
+        )
+        grouped = add_signal_group(
+            add_signal_group(add_signal_group(db, first_group), second_group),
+            other_group,
+        )
+
+        changed = rename_signal(grouped, 500, "EngineSpeed", "RPM")
+
+        assert changed.signal_groups[0].signal_names == ["RPM", "EngineTemp"]
+        assert changed.signal_groups[1].signal_names == ["RPM"]
+        assert changed.signal_groups[2] == other_group
+        assert grouped.signal_groups == [first_group, second_group, other_group]
+
+        reparsed = dbckit.parse(dbckit.dump(changed))
+        assert reparsed.signal_groups[0].signal_names == ["RPM", "EngineTemp"]
+        assert "EngineSpeed" not in reparsed.signal_groups[0].signal_names
+
+    def test_signal_group_consistency_through_views(self, db):
+        group = SignalGroup(
+            name="Powertrain", message_id=500, signal_names=["EngineSpeed"]
+        )
+        grouped = add_signal_group(db, group)
+
+        renamed = grouped.message(500).rename_signal("EngineSpeed", "RPM")
+        deleted = grouped.message(500).signal("EngineSpeed").delete()
+
+        assert renamed.signal_groups[0].signal_names == ["RPM"]
+        assert deleted.signal_groups[0].signal_names == []
 
     def test_update_signal_factor(self, db):
         db2 = update_signal(db, 500, "EngineSpeed", factor=0.5)
