@@ -632,6 +632,25 @@ class DBCTransformer(Transformer):
         )
 
 
+def _reclassify_resolved_decode_diagnostics(db: Database) -> Database:
+    """Mark skipped decode metadata as degrading when its final target exists."""
+    diagnostics: list[ParseDiagnostic] = []
+    for diagnostic in db.parse_diagnostics:
+        if (
+            diagnostic.effect == "cosmetic"
+            and diagnostic.construct in {"VAL_", "SIG_VALTYPE_"}
+            and diagnostic.message_id is not None
+            and diagnostic.signal_name is not None
+        ):
+            message = db.messages.get(diagnostic.message_id)
+            if message is not None and diagnostic.signal_name in message.signals:
+                diagnostic = diagnostic.model_copy(
+                    update={"effect": "decode_degraded"}
+                )
+        diagnostics.append(diagnostic)
+    return db.model_copy(update={"parse_diagnostics": diagnostics})
+
+
 def parse_string(
     text: str,
     *,
@@ -645,7 +664,7 @@ def parse_string(
     )
     tree = get_parser().parse(processed_text)
     try:
-        return DBCTransformer(
+        db = DBCTransformer(
             on_unsupported=policy,
             diagnostics=diagnostics,
         ).transform(tree)
@@ -653,3 +672,4 @@ def parse_string(
         if isinstance(exc.orig_exc, ValueError):
             raise exc.orig_exc from None
         raise
+    return _reclassify_resolved_decode_diagnostics(db)

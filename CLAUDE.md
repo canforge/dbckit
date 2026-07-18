@@ -65,7 +65,9 @@ These fail loudly by design — "fixing" them is a roadmap decision, not a bug f
 - Extended multiplexing (`m0M`, `SG_MUL_VAL_`) is rejected by default; opt-in
   `on_unsupported="skip"` isolates line-bounded forms with decode diagnostics.
 - Dangling `CM_`/`BA_`/`VAL_`/`SIG_VALTYPE_`/`ENVVAR_DATA_` references raise by
-  default and become structured cosmetic diagnostics in skip mode.
+  default and become structured diagnostics in skip mode. Skipped forward
+  `VAL_`/`SIG_VALTYPE_` entries are decode-degraded when their final target
+  survives; references whose targets remain absent are cosmetic.
 - J1939 lookup helpers read explicit `PGN`/`SPN` attributes; frame-stream decoding
   supports derived-PGN `exact`/`j1939`/attribute-gated `auto` matching.
 - CAN FD untested; `.sym`/`.kcd`/ARXML out of scope.

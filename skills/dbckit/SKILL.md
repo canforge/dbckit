@@ -177,9 +177,9 @@ Attribute targets: `node:ECU1`, `message:0x1F4`, `signal:0x1F4:Speed`, `""` = da
   contradictions raise `ValueError`. Strict parsing rejects dangling
   `CM_`/`BA_`/`VAL_`/`SIG_VALTYPE_`/`ENVVAR_DATA_` references. With
   `on_unsupported="skip"`, understood dangling references are omitted and
-  recorded in `parse_diagnostics`; inspect those diagnostics directly for
-  forward-referencing files because the current `cosmetic` classification can
-  be optimistic for `VAL_` and `SIG_VALTYPE_`.
+  recorded in `parse_diagnostics`. A skipped forward `VAL_` or `SIG_VALTYPE_`
+  entry is `decode_degraded` when its message and signal exist in the final
+  model; references whose targets remain absent are `cosmetic`.
 
 ## Full reference
 

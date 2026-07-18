@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/) from 1.0.0 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- Mark skipped forward `VAL_` and `SIG_VALTYPE_` references as
+  `decode_degraded` when their message and signal exist in the final model, so
+  global and per-message decode-safety rollups cannot report a false safe state.
+
 ## [1.1.0] — 2026-07-18
 
 ### Added

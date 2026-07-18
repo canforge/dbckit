@@ -56,8 +56,9 @@ This release built on the 1.0.1 extended-ID fixes because the `PGN` and
   default `"raise"` so 1.0 behavior is unchanged. Each skipped construct or dangling
   reference records a structured diagnostic (construct, line, affected message/signal,
   `effect: decode_degraded | cosmetic`); decode-safety is tracked per message with a
-  derived global rollup. Forward references can make the current `cosmetic`
-  classification optimistic for `VAL_` and `SIG_VALTYPE_`; see the support matrix.
+  derived global rollup. In 1.1.0, forward references could make the `cosmetic`
+  classification optimistic for `VAL_` and `SIG_VALTYPE_`; the 1.1.1 correction
+  reclassifies those omissions when their targets survive in the final model.
   Subsumed the previously deferred `errors="collect"` lenient load mode item.
 - [x] Added J1939 PGN-aware message resolution:
   `decode_frames(..., match="exact" | "j1939" |

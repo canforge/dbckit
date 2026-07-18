@@ -517,7 +517,65 @@ BO_ 100 DefinedLater: 8 ECU
     assert len(db.parse_diagnostics) == 1
     assert db.parse_diagnostics[0].line == 5
     assert db.parse_diagnostics[0].message_id == 100
+    assert db.parse_diagnostics[0].effect == "cosmetic"
     assert db.decode_safe is True
+
+
+def test_skip_forward_decode_references_degrade_final_target():
+    dbc = """\
+VERSION ""
+NS_ :
+BS_ :
+BU_ : E
+SIG_VALTYPE_ 256 F : 1;
+VAL_ 256 State 1 "On" 0 "Off" ;
+BO_ 256 M: 8 E
+ SG_ F : 0|32@1+ (1,0) [0|0] "" E
+ SG_ State : 32|8@1+ (1,0) [0|1] "" E
+"""
+
+    db = dbckit.parse(dbc, on_unsupported="skip")
+
+    assert [diagnostic.construct for diagnostic in db.parse_diagnostics] == [
+        "SIG_VALTYPE_",
+        "VAL_",
+    ]
+    assert [diagnostic.line for diagnostic in db.parse_diagnostics] == [5, 6]
+    assert [diagnostic.message_id for diagnostic in db.parse_diagnostics] == [
+        256,
+        256,
+    ]
+    assert [diagnostic.signal_name for diagnostic in db.parse_diagnostics] == [
+        "F",
+        "State",
+    ]
+    assert [diagnostic.effect for diagnostic in db.parse_diagnostics] == [
+        "decode_degraded",
+        "decode_degraded",
+    ]
+    assert db.messages[256].signals["F"].signal_type is None
+    assert db.messages[256].signals["State"].value_table is None
+    assert db.decode_safe is False
+    assert db.message_decode_safety == {256: False}
+    assert db.message_decode_safe(256) is False
+
+
+def test_forward_decode_reference_preserves_strict_source_order():
+    dbc = """\
+VERSION ""
+NS_ :
+BS_ :
+BU_ : E
+SIG_VALTYPE_ 256 F : 1;
+BO_ 256 M: 8 E
+ SG_ F : 0|32@1+ (1,0) [0|0] "" E
+"""
+
+    with pytest.raises(
+        ValueError,
+        match="SIG_VALTYPE_ references unknown message arbitration_id=0x100",
+    ):
+        dbckit.parse(dbc)
 
 
 def test_message_decode_safe_rejects_unknown_message():
