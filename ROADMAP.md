@@ -67,7 +67,7 @@ live in exactly the `BA_` lines that currently fail to parse on extended-ID file
   auto-detection signal; ambiguous PGN matches are returned explicitly. Pure ID math
   stays in dependency-free functions in `operations/j1939.py` — the extraction seam if
   transport protocol or DM diagnostics ever justify a separate j1939kit.
-- [ ] Timeboxed: try `parser="lalr"` in place of Earley. A cold parse of a 1,900-message
+- [x] Timeboxed: try `parser="lalr"` in place of Earley. A cold parse of a 1,900-message
   / 13,000-signal DBC measures ~10 s and scales linearly; LALR is behavior-neutral if
   the grammar is compatible, and the 1.0.1 round-trip suite verifies it. Defer without
   guilt if the grammar resists.

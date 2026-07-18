@@ -31,8 +31,7 @@ def _load_grammar() -> str:
 def _make_parser() -> Lark:
     return Lark(
         _load_grammar(),
-        parser="earley",
-        ambiguity="resolve",
+        parser="lalr",
         propagate_positions=False,
     )
 

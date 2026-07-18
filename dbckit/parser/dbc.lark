@@ -1,4 +1,4 @@
-// DBC file grammar for Lark (Earley parser, dynamic lexer)
+// DBC file grammar for Lark (LALR parser, contextual lexer)
 // Covers the full DBC specification including real-world quirks
 
 start: section*
@@ -24,7 +24,12 @@ section: version_section
 version_section: "VERSION" STRING
 
 // ── NS_ ────────────────────────────────────────────────────────────────────
-ns_section: "NS_" ":" CNAME*
+ns_section: "NS_" ":" NS_NAME*
+
+// Namespace entries are bare names that occupy the rest of their line. Keeping
+// them distinct from section keywords lets the contextual lexer tell a listed
+// capability such as CM_ from an actual `CM_ BO_ ...` statement.
+NS_NAME.2: /[A-Za-z_][A-Za-z0-9_]*(?=(?:[ \t]+[A-Za-z_][A-Za-z0-9_]*)*[ \t]*(?:\/\/[^\n]*)?(?:\n|$))/
 
 // ── BS_ ────────────────────────────────────────────────────────────────────
 bs_section: "BS_" ":" bit_timing?

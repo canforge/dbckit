@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/) from 1.0.0 onward.
 
 ## [Unreleased]
 
+### Changed
+
+- Replace the Earley DBC parser with LALR and a contextual lexer, preserving
+  namespace capability parsing while substantially reducing parse time for
+  large databases.
+
 ## [1.0.1] — 2026-07-18
 
 ### Fixed
