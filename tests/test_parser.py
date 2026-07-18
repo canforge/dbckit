@@ -553,6 +553,16 @@ BO_ 256 M: 8 E
         "decode_degraded",
         "decode_degraded",
     ]
+    assert [diagnostic.detail for diagnostic in db.parse_diagnostics] == [
+        (
+            "SIG_VALTYPE_ target signal 'F' in message arbitration_id=0x100 "
+            "was declared later; the skipped content affects decoding"
+        ),
+        (
+            "VAL_ target signal 'State' in message arbitration_id=0x100 was "
+            "declared later; the skipped content affects decoding"
+        ),
+    ]
     assert db.messages[256].signals["F"].signal_type is None
     assert db.messages[256].signals["State"].value_table is None
     assert db.decode_safe is False

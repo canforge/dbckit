@@ -644,8 +644,14 @@ def _reclassify_resolved_decode_diagnostics(db: Database) -> Database:
         ):
             message = db.messages.get(diagnostic.message_id)
             if message is not None and diagnostic.signal_name in message.signals:
+                detail = (
+                    f"{diagnostic.construct} target signal "
+                    f"'{diagnostic.signal_name}' in message "
+                    f"arbitration_id={diagnostic.message_id:#x} was declared later; "
+                    "the skipped content affects decoding"
+                )
                 diagnostic = diagnostic.model_copy(
-                    update={"effect": "decode_degraded"}
+                    update={"effect": "decode_degraded", "detail": detail}
                 )
         diagnostics.append(diagnostic)
     return db.model_copy(update={"parse_diagnostics": diagnostics})
