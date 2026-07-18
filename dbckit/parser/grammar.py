@@ -12,6 +12,7 @@ from dbckit._cycle_time import (
     coerce_cycle_time,
     validate_cycle_time,
 )
+from dbckit._frame_id import decode_dbc_frame_id
 from dbckit.model.database import (
     AttributeDefinition,
     AttributeKind,
@@ -152,10 +153,7 @@ class DBCTransformer(Transformer):
 
     # ── BO_ messages ─────────────────────────────────────────────────────
     def message_section(self, items: list) -> None:
-        raw_id = _int(items[0])
-        # Bit 31 set in the DBC integer signals an extended (29-bit) CAN frame.
-        is_extended = raw_id >= 0x80000000
-        arb_id = raw_id & 0x1FFFFFFF if is_extended else raw_id
+        arb_id, is_extended = decode_dbc_frame_id(_int(items[0]))
         name = str(items[1])
         dlc = _int(items[2])
         sender = str(items[3])
@@ -225,15 +223,17 @@ class DBCTransformer(Transformer):
 
     # ── BO_TX_BU_ ────────────────────────────────────────────────────────
     def message_transmitters_section(self, items: list) -> None:
-        arb_id = _int(items[0])
+        arb_id, _ = decode_dbc_frame_id(_int(items[0]))
         senders = [str(t) for t in items[1:]]
-        if arb_id in self._db.messages:
-            msg = self._db.messages[arb_id]
-            self._db.messages[arb_id] = msg.model_copy(update={"senders": senders})
+        msg = self._db.messages.get(arb_id)
+        if msg is not None:
+            self._db.messages[msg.arbitration_id] = msg.model_copy(
+                update={"senders": senders}
+            )
 
     # ── SIG_GROUP_ ───────────────────────────────────────────────────────
     def sig_group_section(self, items: list) -> None:
-        msg_id = _int(items[0])
+        msg_id, _ = decode_dbc_frame_id(_int(items[0]))
         name = str(items[1])
         repetitions = _int(items[2])
         signal_names = [str(t) for t in items[3:]]
@@ -248,12 +248,14 @@ class DBCTransformer(Transformer):
 
     # ── CM_ comments ─────────────────────────────────────────────────────
     def msg_comment(self, items: list) -> None:
-        arb_id = _int(items[0])
+        arb_id, _ = decode_dbc_frame_id(_int(items[0]))
         msg = self._require_message(arb_id, "CM_")
-        self._db.messages[arb_id] = msg.model_copy(update={"comment": _str(items[1])})
+        self._db.messages[msg.arbitration_id] = msg.model_copy(
+            update={"comment": _str(items[1])}
+        )
 
     def sig_comment(self, items: list) -> None:
-        arb_id = _int(items[0])
+        arb_id, _ = decode_dbc_frame_id(_int(items[0]))
         sig_name = str(items[1])
         msg, sig = self._require_signal(arb_id, sig_name, "CM_")
         msg.signals[sig_name] = sig.model_copy(update={"comment": _str(items[2])})
@@ -364,7 +366,8 @@ class DBCTransformer(Transformer):
     def attr_val_msg_str(self, items: list) -> None:
         self._apply_msg_attr(_str(items[0]), _int(items[1]), items[2])
 
-    def _apply_msg_attr(self, name: str, arb_id: int, raw: Any) -> None:
+    def _apply_msg_attr(self, name: str, raw_id: int, raw: Any) -> None:
+        arb_id, _ = decode_dbc_frame_id(raw_id)
         msg = self._require_message(arb_id, "BA_")
         ad = self._db.attributes.get(name)
         if name == CYCLE_TIME_ATTRIBUTE:
@@ -374,7 +377,7 @@ class DBCTransformer(Transformer):
                 else validate_cycle_time(raw, ad)
             )
             attributes = {**msg.attributes, name: val}
-            self._db.messages[arb_id] = msg.model_copy(
+            self._db.messages[msg.arbitration_id] = msg.model_copy(
                 update={"attributes": attributes, "cycle_time": val}
             )
         else:
@@ -387,7 +390,8 @@ class DBCTransformer(Transformer):
     def attr_val_sig_str(self, items: list) -> None:
         self._apply_sig_attr(_str(items[0]), _int(items[1]), str(items[2]), items[3])
 
-    def _apply_sig_attr(self, name: str, arb_id: int, sig_name: str, raw: Any) -> None:
+    def _apply_sig_attr(self, name: str, raw_id: int, sig_name: str, raw: Any) -> None:
+        arb_id, _ = decode_dbc_frame_id(raw_id)
         _, sig = self._require_signal(arb_id, sig_name, "BA_")
         ad = self._db.attributes.get(name)
         val = _coerce_attr(raw, ad.kind if ad else AttributeKind.STRING)
@@ -419,7 +423,7 @@ class DBCTransformer(Transformer):
 
     # ── VAL_ ─────────────────────────────────────────────────────────────
     def signal_val(self, items: list) -> None:
-        arb_id = _int(items[0])
+        arb_id, _ = decode_dbc_frame_id(_int(items[0]))
         sig_name = str(items[1])
         msg, sig = self._require_signal(arb_id, sig_name, "VAL_")
         vals: dict[int, str] = {}
@@ -440,7 +444,7 @@ class DBCTransformer(Transformer):
 
     # ── SIG_VALTYPE_ / EV_ / ENVVAR_DATA_ ────────────────────────────────
     def sig_valtype_section(self, items: list) -> None:
-        arb_id = _int(items[0])
+        arb_id, _ = decode_dbc_frame_id(_int(items[0]))
         sig_name = str(items[1])
         sig_type = _int(items[2])
         msg, sig = self._require_signal(arb_id, sig_name, "SIG_VALTYPE_")

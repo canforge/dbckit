@@ -121,6 +121,20 @@ def test_extended_frame_serialized_with_high_bit():
     assert "2147483904" in text  # 0x80000100
 
 
+def test_extended_frame_transmitters_serialized_with_high_bit():
+    msg = Message(
+        arbitration_id=0x100,
+        name="M",
+        length=8,
+        is_extended_frame=True,
+        senders=["ECU1", "ECU2"],
+    )
+    text = dump(Database(messages={0x100: msg}))
+
+    assert "BO_ 2147483904 M:" in text
+    assert "BO_TX_BU_ 2147483904 : ECU1,ECU2;" in text
+
+
 def test_standard_frame_serialized_without_high_bit():
     db = dbckit.load(FIXTURES / "extended.dbc")
     text = dump(db)

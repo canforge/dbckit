@@ -6,6 +6,7 @@ from dbckit._cycle_time import (
     coerce_cycle_time,
     validate_cycle_time,
 )
+from dbckit._frame_id import encode_dbc_frame_id
 from dbckit.model.database import AttributeDefinition, AttributeKind, Database
 from dbckit.model.message import Message
 from dbckit.model.signal import ByteOrder, Signal
@@ -62,7 +63,7 @@ def dump(db: Database) -> str:
 
     # BO_ / SG_
     for msg in db.messages.values():
-        emit_id = msg.arbitration_id | 0x80000000 if msg.is_extended_frame else msg.arbitration_id
+        emit_id = encode_dbc_frame_id(msg.arbitration_id, msg.is_extended_frame)
         sender = msg.senders[0] if msg.senders else "Vector__XXX"
         out.append(f"\nBO_ {emit_id} {msg.name}: {msg.length} {sender}\n")
         for sig in msg.signals.values():
@@ -73,7 +74,7 @@ def dump(db: Database) -> str:
     tx_lines: list[str] = []
     for msg in db.messages.values():
         if len(msg.senders) > 1:
-            emit_id = msg.arbitration_id | 0x80000000 if msg.is_extended_frame else msg.arbitration_id
+            emit_id = encode_dbc_frame_id(msg.arbitration_id, msg.is_extended_frame)
             tx_lines.append(
                 f"BO_TX_BU_ {emit_id} : {','.join(msg.senders)};\n"
             )

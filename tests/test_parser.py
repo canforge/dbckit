@@ -20,6 +20,11 @@ BO_ 100 ExistingMessage: 8 ECU
  SG_ ExistingSignal : 0|8@1+ (1,0) [0|255] "" ECU
 """
 
+EXTENDED_ID = 0x18FF1234
+FLAGGED_EXTENDED_ID = EXTENDED_ID | 0x80000000
+MISSING_ID = 999
+FLAGGED_MISSING_ID = MISSING_ID | 0x80000000
+
 
 def test_parse_version():
     db = dbckit.parse('VERSION "1.2.3"\n\nNS_ :\n\nBS_ :\n\nBU_ :\n')
@@ -131,6 +136,108 @@ SG_MUL_VAL_ 100 ExistingSignal ExistingSignal 0-1;
     )
     with pytest.raises(ValueError, match=re.escape(error)):
         dbckit.parse(dbc)
+
+
+def test_extended_frame_references_use_clean_arbitration_id():
+    dbc = f"""\
+VERSION ""
+NS_ :
+BS_ :
+BU_ : ECU1 ECU2
+BO_ {FLAGGED_EXTENDED_ID} ExtendedMessage: 8 ECU1
+ SG_ State : 0|8@1+ (1,0) [0|255] "" ECU2
+BO_TX_BU_ {FLAGGED_EXTENDED_ID} : ECU1,ECU2;
+SIG_GROUP_ {FLAGGED_EXTENDED_ID} Status 1 : State;
+CM_ BO_ {FLAGGED_EXTENDED_ID} "message comment";
+CM_ SG_ {FLAGGED_EXTENDED_ID} State "signal comment";
+BA_DEF_ BO_ "GenMsgCycleTime" INT 0 1000;
+BA_DEF_ BO_ "MessageAttr" INT 0 10;
+BA_DEF_ SG_ "SignalAttr" INT 0 10;
+BA_ "GenMsgCycleTime" BO_ {FLAGGED_EXTENDED_ID} 25;
+BA_ "MessageAttr" BO_ {FLAGGED_EXTENDED_ID} 7;
+BA_ "SignalAttr" SG_ {FLAGGED_EXTENDED_ID} State 9;
+VAL_ {FLAGGED_EXTENDED_ID} State 0 "Off" 1 "On";
+SIG_VALTYPE_ {FLAGGED_EXTENDED_ID} State : 1;
+"""
+
+    db = dbckit.parse(dbc)
+
+    assert list(db.messages) == [EXTENDED_ID]
+    msg = db.messages[EXTENDED_ID]
+    assert msg.arbitration_id == EXTENDED_ID
+    assert msg.is_extended_frame is True
+    assert msg.senders == ["ECU1", "ECU2"]
+    assert msg.comment == "message comment"
+    assert msg.cycle_time == 25
+    assert msg.attributes["GenMsgCycleTime"] == 25
+    assert msg.attributes["MessageAttr"] == 7
+
+    sig = msg.signals["State"]
+    assert sig.comment == "signal comment"
+    assert sig.attributes["SignalAttr"] == 9
+    assert sig.signal_type == 1
+    assert sig.value_table is not None
+    assert sig.value_table.values == {0: "Off", 1: "On"}
+
+    assert len(db.signal_groups) == 1
+    group = db.signal_groups[0]
+    assert group.message_id == EXTENDED_ID
+    assert group.signal_names == ["State"]
+
+
+@pytest.mark.parametrize(
+    ("entry", "section"),
+    [
+        (f'CM_ BO_ {FLAGGED_MISSING_ID} "comment";', "CM_"),
+        (f'BA_ "Attr" BO_ {FLAGGED_MISSING_ID} 1;', "BA_"),
+        (f'VAL_ {FLAGGED_MISSING_ID} MissingSignal 0 "Off";', "VAL_"),
+        (
+            f"SIG_VALTYPE_ {FLAGGED_MISSING_ID} MissingSignal : 1;",
+            "SIG_VALTYPE_",
+        ),
+    ],
+)
+def test_flagged_dangling_reference_reports_clean_id(entry: str, section: str):
+    error = f"{section} references unknown message arbitration_id={MISSING_ID:#x}"
+    with pytest.raises(ValueError, match=re.escape(error)):
+        dbckit.parse(f"{MINIMAL_DBC}\n{entry}\n")
+
+
+def test_flagged_forward_reference_preserves_strict_source_order():
+    dbc = f"""\
+VERSION ""
+NS_ :
+BS_ :
+BU_ : ECU
+CM_ BO_ {FLAGGED_EXTENDED_ID} "defined later";
+BO_ {FLAGGED_EXTENDED_ID} ExtendedMessage: 8 ECU
+"""
+    error = f"CM_ references unknown message arbitration_id={EXTENDED_ID:#x}"
+    with pytest.raises(ValueError, match=re.escape(error)):
+        dbckit.parse(dbc)
+
+
+def test_flagged_unknown_non_strict_references_remain_non_raising():
+    dbc = f"""\
+{MINIMAL_DBC}
+BO_TX_BU_ {FLAGGED_MISSING_ID} : ECU,Other;
+SIG_GROUP_ {FLAGGED_MISSING_ID} MissingGroup 1 : MissingSignal;
+"""
+
+    db = dbckit.parse(dbc)
+
+    assert db.messages[100].senders == ["ECU"]
+    assert db.signal_groups[0].message_id == MISSING_ID
+
+
+def test_flagged_reference_matches_standard_message_by_clean_id():
+    flagged_standard_id = 100 | 0x80000000
+    db = dbckit.parse(
+        f'{MINIMAL_DBC}\nCM_ BO_ {flagged_standard_id} "masked match";\n'
+    )
+
+    assert db.messages[100].is_extended_frame is False
+    assert db.messages[100].comment == "masked match"
 
 
 @pytest.mark.parametrize(
