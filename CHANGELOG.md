@@ -29,6 +29,11 @@ Versioning follows [Semantic Versioning](https://semver.org/) from 1.0.0 onward.
   namespace capability parsing while substantially reducing parse time for
   large databases.
 
+### Fixed
+
+- Preserve inline `NS_` capability lists and accept the legacy split
+  `VAL_TABLE_` form immediately after namespace entries.
+
 ## [1.0.1] — 2026-07-18
 
 ### Fixed

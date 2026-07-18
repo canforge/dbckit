@@ -28,8 +28,10 @@ ns_section: "NS_" ":" NS_NAME*
 
 // Namespace entries are bare names that occupy the rest of their line. Keeping
 // them distinct from section keywords lets the contextual lexer tell a listed
-// capability such as CM_ from an actual `CM_ BO_ ...` statement.
-NS_NAME.2: /[A-Za-z_][A-Za-z0-9_]*(?=(?:[ \t]+[A-Za-z_][A-Za-z0-9_]*)*[ \t]*(?:\/\/[^\n]*)?(?:\n|$))/
+// capability such as CM_ from an actual `CM_ BO_ ...` statement. The negative
+// lookahead preserves the legacy split VAL_TABLE_ form, where its keyword,
+// name, and first value start on separate lines immediately after NS_.
+NS_NAME.2: /(?!VAL_TABLE_(?=[ \t]*(?:\/\/[^\n]*)?\n[ \t]*[A-Za-z_][A-Za-z0-9_]*[ \t]*(?:\/\/[^\n]*)?\n[ \t]*[0-9]))[A-Za-z_][A-Za-z0-9_]*(?=(?:[ \t]+[A-Za-z_][A-Za-z0-9_]*)*[ \t]*(?:\/\/[^\n]*)?(?:\n|$))/
 
 // ── BS_ ────────────────────────────────────────────────────────────────────
 bs_section: "BS_" ":" bit_timing?

@@ -143,6 +143,43 @@ BU_ : ECU
     assert reparsed.ns_values == db.ns_values
 
 
+def test_inline_namespace_tokens_round_trip():
+    dbc = """\
+VERSION ""
+NS_ : NS_DESC_ CM_ BA_DEF_ SG_MUL_VAL_
+BS_ :
+BU_ :
+"""
+
+    db = dbckit.parse(dbc)
+    assert db.ns_values == ["NS_DESC_", "CM_", "BA_DEF_", "SG_MUL_VAL_"]
+
+    reparsed = dbckit.parse(dbckit.dump(db))
+    assert reparsed.ns_values == db.ns_values
+
+
+def test_split_value_table_after_namespace_round_trips():
+    dbc = """\
+VERSION ""
+NS_ :
+    NS_DESC_
+    CM_
+VAL_TABLE_
+SwitchStates
+0 "Off" 1 "On";
+BS_ :
+BU_ :
+"""
+
+    db = dbckit.parse(dbc)
+    assert db.ns_values == ["NS_DESC_", "CM_"]
+    assert db.value_tables["SwitchStates"].values == {0: "Off", 1: "On"}
+
+    reparsed = dbckit.parse(dbckit.dump(db))
+    assert reparsed.ns_values == db.ns_values
+    assert reparsed.value_tables == db.value_tables
+
+
 def test_extended_mux_section_raises_clear_error():
     dbc = f"""\
 {MINIMAL_DBC}
