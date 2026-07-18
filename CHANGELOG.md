@@ -9,6 +9,8 @@ Versioning follows [Semantic Versioning](https://semver.org/) from 1.0.0 onward.
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-07-18
+
 ### Added
 
 - Add a task-oriented recipe cookbook covering validation, diffs, extraction,
