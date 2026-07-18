@@ -9,6 +9,13 @@ Versioning follows [Semantic Versioning](https://semver.org/) from 1.0.0 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- Normalize DBC bit-31 extended-frame IDs across every parser-side message
+  reference, so comments, attributes, value mappings, signal types,
+  transmitters, and signal groups resolve or store the clean arbitration ID
+  without creating duplicate message keys.
+
 ## [1.0.0] — 2026-07-15
 
 Initial public release.

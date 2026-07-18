@@ -117,10 +117,14 @@ value raises `ValueError`.
 ## Extended frames
 
 Extended (29-bit) CAN frame IDs are encoded in DBC files by setting bit 31 of
-the integer on the `BO_` line (i.e. `arbitration_id | 0x80000000`).
+the message ID integer (i.e. `arbitration_id | 0x80000000`) on `BO_` definitions
+and sections that repeat the message ID.
 
-- **Parsed:** the high bit is detected, stripped, and `Message.is_extended_frame`
-  is set to `True`.  `Message.arbitration_id` always stores the clean 29-bit ID.
+- **Parsed:** the high bit is detected and stripped from `BO_`, `BO_TX_BU_`,
+  `SIG_GROUP_`, message/signal `CM_`, message/signal `BA_`, `VAL_`, and
+  `SIG_VALTYPE_` IDs. `Message.is_extended_frame` is set from the `BO_`
+  definition, and in-memory message and signal-group IDs always use the clean
+  29-bit arbitration ID.
 - **Serialized:** the high bit is re-applied when emitting `BO_` and `BO_TX_BU_`
   lines for extended-frame messages.
 - **Round-trip:** fully supported.
@@ -166,4 +170,5 @@ Sender and receiver references are validated by `MISSING_SENDER` and
   identifies the section and missing target and is raised as `ValueError`.
 - **Duplicate message IDs in source:** the last `BO_` definition wins (parser overwrites).
 - **Extended frames:** `Message.is_extended_frame` records the DBC bit-31 convention;
-  parsing strips the marker from `arbitration_id`, and serialization restores it.
+  parsing strips the marker from message definitions and references, while
+  serialization restores it on `BO_` and `BO_TX_BU_` lines.

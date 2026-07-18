@@ -30,7 +30,7 @@ Bug fixes only, no API change. Ship first and alone: extended flagged IDs plus
 `CM_`/`BA_`/`VAL_` sections are the norm in real-world J1939 DBCs, and today such files
 cannot load at all — which pushes clients into stripping sections to work around it.
 
-- [ ] Normalize the extended-frame flag through one shared helper at every message
+- [x] Normalize the extended-frame flag through one shared helper at every message
   reference, not only `BO_`: `CM_`/`BA_`/`VAL_`/`SIG_VALTYPE_` look up messages by the
   raw flagged ID and fail, `BO_TX_BU_` silently drops senders, `SIG_GROUP_` stores the
   unmasked ID, and the `CM_ BO_` handler writes back under the raw key (would duplicate
