@@ -222,6 +222,7 @@ See the [CLI reference](docs/cli.md) for every command and option.
 
 ## Documentation
 
+- [Recipes](docs/recipes.md) — short, runnable patterns for common dbckit tasks
 - [API reference](docs/api-reference.md) — the detailed public API contract,
   including codec overflow/error behavior and validation issue codes
 - [DBC support matrix](docs/dbc-support.md) — which DBC sections and

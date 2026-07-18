@@ -84,8 +84,9 @@ ROADMAP.md is the authority on which of these change in 1.0.1/1.1.0 and how.
 ## Docs that must move together
 
 A change to the public surface touches all of: `docs/api-reference.md`, `docs/cli.md`,
-`docs/dbc-support.md`, `CHANGELOG.md` (Keep a Changelog, semver), and the verbatim copies
-in `skills/dbckit/references/` (agent skill; sync = `cp` from docs/, drift guard planned).
+`docs/dbc-support.md`, `docs/recipes.md`, `CHANGELOG.md` (Keep a Changelog, semver), and
+the verbatim copies in `skills/dbckit/references/` (agent skill; sync = `cp` from docs/,
+drift guard planned).
 README stays a teaser — full API/CLI detail lives in docs/, not README.
 
 ## Releasing

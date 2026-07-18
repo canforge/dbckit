@@ -180,6 +180,7 @@ Attribute targets: `node:ECU1`, `message:0x1F4`, `signal:0x1F4:Speed`, `""` = da
 Bundled with this skill — read them instead of searching installed sources or
 the web when a question goes beyond this file:
 
+- `references/recipes.md` — runnable patterns for common tasks composed from the public API
 - `references/api-reference.md` — the complete public API contract, including
   every model field, method signature, raise condition, and codec edge case
 - `references/cli.md` — every CLI command and option

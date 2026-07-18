@@ -11,6 +11,9 @@ Versioning follows [Semantic Versioning](https://semver.org/) from 1.0.0 onward.
 
 ### Added
 
+- Add a task-oriented recipe cookbook covering validation, diffs, extraction,
+  normalization, bulk edits, streaming log export, lenient parsing, J1939 frame
+  resolution, and standalone Python decoder generation.
 - Add PGN-aware J1939 frame resolution with `match="j1939"` and attribute-gated
   `match="auto"` modes on `decode_frames()` and `decode_log()`, plus the matching
   CLI option. PGNs are derived from 29-bit IDs with PDU1/PDU2 handling;

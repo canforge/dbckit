@@ -87,7 +87,7 @@ Nonblocking; decide per item whether it lands in a 1.x release:
   and `dev` dependency groups — modern typer bundles rich, and the extra now emits an
   install warning
 - [ ] Guard the agent skill's bundled docs against drift: `skills/dbckit/references/` holds
-  verbatim copies of `docs/{api-reference,cli,dbc-support}.md` so agents get local,
+  verbatim copies of `docs/{api-reference,cli,dbc-support,recipes}.md` so agents get local,
   version-coherent reads. Add a `scripts/sync_skill_refs.sh` (plain `cp`) plus a CI step
   that `diff -r`s the two locations, so a PR touching docs without re-syncing fails; add
   a "Canonical source + version" header line to each bundled copy
