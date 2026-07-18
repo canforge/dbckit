@@ -18,6 +18,9 @@ Versioning follows [Semantic Versioning](https://semver.org/) from 1.0.0 onward.
 - Reapply the extended-frame flag across every serializer-side message
   reference, so emitted comments, attributes, value mappings, signal types,
   transmitters, and signal groups use the same DBC wire ID as `BO_`.
+- Accept the bare `SG_MUL_VAL_` capability token inside `NS_` and preserve it
+  across round trips, while continuing to reject extended-multiplexing range
+  statements with a targeted parser error.
 
 ## [1.0.0] — 2026-07-15
 

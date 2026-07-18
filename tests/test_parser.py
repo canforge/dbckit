@@ -125,6 +125,24 @@ BO_ 100 ExtendedMux: 8 ECU
         dbckit.parse(dbc)
 
 
+def test_bare_extended_mux_namespace_token_round_trips():
+    dbc = """\
+VERSION ""
+NS_ :
+    NS_DESC_
+    SG_MUL_VAL_ // namespace capability token
+    CM_
+BS_ :
+BU_ : ECU
+"""
+
+    db = dbckit.parse(dbc)
+    assert db.ns_values == ["NS_DESC_", "SG_MUL_VAL_", "CM_"]
+
+    reparsed = dbckit.parse(dbckit.dump(db))
+    assert reparsed.ns_values == db.ns_values
+
+
 def test_extended_mux_section_raises_clear_error():
     dbc = f"""\
 {MINIMAL_DBC}

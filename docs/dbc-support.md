@@ -13,7 +13,7 @@ equivalent output.
 | Section | What is stored |
 |---------|----------------|
 | `VERSION` | Version string |
-| `NS_` | Namespace keyword list (preserved as-is) |
+| `NS_` | Namespace keyword list (preserved as-is), including the bare `SG_MUL_VAL_` capability token |
 | `BS_` | Bit timing string (preserved as-is) |
 | `BU_` | Node names, comments, and attribute values |
 | `VAL_TABLE_` | Named global value tables |
@@ -100,7 +100,8 @@ value raises `ValueError`.
 
 - Extended multiplexing (``m0M``-style nested selectors) is not supported by
   ``decode_frame`` / ``encode_frame``. Inline nested selectors and
-  `SG_MUL_VAL_` ranges are rejected with clear parser errors.
+  `SG_MUL_VAL_` range statements are rejected with clear parser errors. A bare
+  `SG_MUL_VAL_` capability token inside `NS_` is accepted and round-tripped.
 
 ## CAN and format scope
 
@@ -162,8 +163,9 @@ Sender and receiver references are validated by `MISSING_SENDER` and
 - **Determinism:** serializer output is deterministic; section and entry order is stable
   across repeated calls on the same `Database` object.
 - **Unknown sections:** DBC sections not listed above will cause a parse error if encountered
-  inline; they are not silently skipped. `SG_MUL_VAL_` receives a targeted unsupported-feature
-  error rather than a raw Lark syntax error.
+  inline; they are not silently skipped. An `SG_MUL_VAL_` range statement receives a targeted
+  unsupported-feature error rather than a raw Lark syntax error; the bare `NS_` capability
+  token is supported.
 - **Dangling references:** the parser strictly rejects `CM_`, `BA_`, `VAL_`,
   `SIG_VALTYPE_`, and `ENVVAR_DATA_` entries that refer to an unknown message,
   signal, or environment variable. References are resolved in source order, so the

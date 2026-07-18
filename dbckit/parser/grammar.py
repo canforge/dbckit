@@ -477,7 +477,13 @@ class DBCTransformer(Transformer):
 def parse_string(text: str) -> Database:
     """Parse a DBC-formatted string and return a Database model."""
     for line_number, line in enumerate(text.splitlines(), start=1):
-        if line.lstrip().split(maxsplit=1)[:1] == ["SG_MUL_VAL_"]:
+        parts = line.lstrip().split(maxsplit=1)
+        is_extended_mux_statement = (
+            parts[:1] == ["SG_MUL_VAL_"]
+            and len(parts) > 1
+            and bool(parts[1].split("//", maxsplit=1)[0].strip())
+        )
+        if is_extended_mux_statement:
             raise ValueError(
                 f"Unsupported DBC construct 'SG_MUL_VAL_' at line {line_number}: "
                 "extended multiplexing ranges are not supported"

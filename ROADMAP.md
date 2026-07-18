@@ -37,7 +37,7 @@ cannot load at all — which pushes clients into stripping sections to work arou
   messages once lookups alone were fixed)
 - [x] Serialize the flagged ID consistently in every section, not only `BO_`, so emitted
   files round-trip and match what other tools expect
-- [ ] Accept the bare `SG_MUL_VAL_` token inside `NS_:`; reject only an actual statement
+- [x] Accept the bare `SG_MUL_VAL_` token inside `NS_:`; reject only an actual statement
   (has arguments). Real extended multiplexing is already rejected at the signal level,
   so the line-based pre-scan may shrink to nothing
 - [ ] Regression fixture: a CSS-Electronics-shaped DBC (extended flagged IDs,
