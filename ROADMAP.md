@@ -35,7 +35,7 @@ cannot load at all — which pushes clients into stripping sections to work arou
   raw flagged ID and fail, `BO_TX_BU_` silently drops senders, `SIG_GROUP_` stores the
   unmasked ID, and the `CM_ BO_` handler writes back under the raw key (would duplicate
   messages once lookups alone were fixed)
-- [ ] Serialize the flagged ID consistently in every section, not only `BO_`, so emitted
+- [x] Serialize the flagged ID consistently in every section, not only `BO_`, so emitted
   files round-trip and match what other tools expect
 - [ ] Accept the bare `SG_MUL_VAL_` token inside `NS_:`; reject only an actual statement
   (has arguments). Real extended multiplexing is already rejected at the signal level,

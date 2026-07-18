@@ -23,6 +23,11 @@ def _fmt(v: float) -> str:
     return repr(v)
 
 
+def _emit_id(message: Message) -> int:
+    """Return the DBC wire ID for a message."""
+    return encode_dbc_frame_id(message.arbitration_id, message.is_extended_frame)
+
+
 def dump(db: Database) -> str:
     """Serialize a Database to a DBC-formatted string."""
     out: list[str] = []
@@ -63,7 +68,7 @@ def dump(db: Database) -> str:
 
     # BO_ / SG_
     for msg in db.messages.values():
-        emit_id = encode_dbc_frame_id(msg.arbitration_id, msg.is_extended_frame)
+        emit_id = _emit_id(msg)
         sender = msg.senders[0] if msg.senders else "Vector__XXX"
         out.append(f"\nBO_ {emit_id} {msg.name}: {msg.length} {sender}\n")
         for sig in msg.signals.values():
@@ -74,7 +79,7 @@ def dump(db: Database) -> str:
     tx_lines: list[str] = []
     for msg in db.messages.values():
         if len(msg.senders) > 1:
-            emit_id = encode_dbc_frame_id(msg.arbitration_id, msg.is_extended_frame)
+            emit_id = _emit_id(msg)
             tx_lines.append(
                 f"BO_TX_BU_ {emit_id} : {','.join(msg.senders)};\n"
             )
@@ -103,11 +108,12 @@ def dump(db: Database) -> str:
     if "comment" in db.dbc_specific:
         cm.append(f"CM_ {_q(str(db.dbc_specific['comment']))};\n")
     for msg in db.messages.values():
+        emit_id = _emit_id(msg)
         if msg.comment:
-            cm.append(f"CM_ BO_  {msg.arbitration_id} {_q(msg.comment)};\n")
+            cm.append(f"CM_ BO_  {emit_id} {_q(msg.comment)};\n")
         for sig in msg.signals.values():
             if sig.comment:
-                cm.append(f"CM_ SG_  {msg.arbitration_id} {sig.name} {_q(sig.comment)};\n")
+                cm.append(f"CM_ SG_  {emit_id} {sig.name} {_q(sig.comment)};\n")
     for node in db.nodes.values():
         if node.comment:
             cm.append(f"CM_ BU_  {node.name} {_q(node.comment)};\n")
@@ -142,10 +148,11 @@ def dump(db: Database) -> str:
 
     # BA_ — message / signal level
     for msg, cycle_time in zip(db.messages.values(), cycle_times):
+        emit_id = _emit_id(msg)
         if cycle_time is not None:
             kind = attributes[CYCLE_TIME_ATTRIBUTE].kind
             out.append(
-                f"BA_ {_q(CYCLE_TIME_ATTRIBUTE)} BO_ {msg.arbitration_id} "
+                f"BA_ {_q(CYCLE_TIME_ATTRIBUTE)} BO_ {emit_id} "
                 f"{_fmt_attr_val(cycle_time, kind)};\n"
             )
         for name, val in msg.attributes.items():
@@ -153,13 +160,13 @@ def dump(db: Database) -> str:
                 continue
             ad = attributes.get(name)
             kind = ad.kind if ad else AttributeKind.STRING
-            out.append(f"BA_ {_q(name)} BO_ {msg.arbitration_id} {_fmt_attr_val(val, kind)};\n")
+            out.append(f"BA_ {_q(name)} BO_ {emit_id} {_fmt_attr_val(val, kind)};\n")
         for sig in msg.signals.values():
             for name, val in sig.attributes.items():
                 ad = attributes.get(name)
                 kind = ad.kind if ad else AttributeKind.STRING
                 out.append(
-                    f"BA_ {_q(name)} SG_ {msg.arbitration_id} {sig.name} {_fmt_attr_val(val, kind)};\n"
+                    f"BA_ {_q(name)} SG_ {emit_id} {sig.name} {_fmt_attr_val(val, kind)};\n"
                 )
 
     # BA_ — node level
@@ -179,12 +186,13 @@ def dump(db: Database) -> str:
     # VAL_
     val_lines: list[str] = []
     for msg in db.messages.values():
+        emit_id = _emit_id(msg)
         for sig in msg.signals.values():
             if sig.value_table:
                 entries = " ".join(
                     f"{k} {_q(v)}" for k, v in sorted(sig.value_table.values.items())
                 )
-                val_lines.append(f"VAL_ {msg.arbitration_id} {sig.name} {entries} ;\n")
+                val_lines.append(f"VAL_ {emit_id} {sig.name} {entries} ;\n")
     for ev in db.environment_variables.values():
         if ev.value_table:
             entries = " ".join(
@@ -199,8 +207,10 @@ def dump(db: Database) -> str:
     if db.signal_groups:
         out.append("\n")
         for sg in db.signal_groups:
+            message = db.messages.get(sg.message_id)
+            emit_id = _emit_id(message) if message is not None else sg.message_id
             out.append(
-                f"SIG_GROUP_ {sg.message_id} {sg.name} {sg.repetitions} : "
+                f"SIG_GROUP_ {emit_id} {sg.name} {sg.repetitions} : "
                 + " ".join(sg.signal_names)
                 + ";\n"
             )
@@ -208,10 +218,11 @@ def dump(db: Database) -> str:
     # SIG_VALTYPE_
     sigtype_lines: list[str] = []
     for msg in db.messages.values():
+        emit_id = _emit_id(msg)
         for sig in msg.signals.values():
             if sig.signal_type is not None:
                 sigtype_lines.append(
-                    f"SIG_VALTYPE_ {msg.arbitration_id} {sig.name} : {sig.signal_type} ;\n"
+                    f"SIG_VALTYPE_ {emit_id} {sig.name} : {sig.signal_type} ;\n"
                 )
     if sigtype_lines:
         out.append("\n")

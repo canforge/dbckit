@@ -125,8 +125,9 @@ and sections that repeat the message ID.
   `SIG_VALTYPE_` IDs. `Message.is_extended_frame` is set from the `BO_`
   definition, and in-memory message and signal-group IDs always use the clean
   29-bit arbitration ID.
-- **Serialized:** the high bit is re-applied when emitting `BO_` and `BO_TX_BU_`
-  lines for extended-frame messages.
+- **Serialized:** the high bit is re-applied to `BO_`, `BO_TX_BU_`, `SIG_GROUP_`,
+  message/signal `CM_`, message/signal `BA_`, `VAL_`, and `SIG_VALTYPE_`
+  message IDs.
 - **Round-trip:** fully supported.
 
 Standard frames (`is_extended_frame=False`, default) use 11-bit IDs (0–0x7FF).
@@ -171,4 +172,4 @@ Sender and receiver references are validated by `MISSING_SENDER` and
 - **Duplicate message IDs in source:** the last `BO_` definition wins (parser overwrites).
 - **Extended frames:** `Message.is_extended_frame` records the DBC bit-31 convention;
   parsing strips the marker from message definitions and references, while
-  serialization restores it on `BO_` and `BO_TX_BU_` lines.
+  serialization restores it on every section that references the message ID.

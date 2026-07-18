@@ -6,9 +6,14 @@ from pathlib import Path
 import pytest
 
 import dbckit
-from dbckit.model.database import Database, EnvironmentVariable
+from dbckit.model.database import (
+    AttributeDefinition,
+    AttributeKind,
+    Database,
+    EnvironmentVariable,
+)
 from dbckit.model.message import Message
-from dbckit.model.signal import ByteOrder, Signal
+from dbckit.model.signal import ByteOrder, Signal, SignalGroup, ValueTable
 from dbckit.serializer import dump
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -133,6 +138,128 @@ def test_extended_frame_transmitters_serialized_with_high_bit():
 
     assert "BO_ 2147483904 M:" in text
     assert "BO_TX_BU_ 2147483904 : ECU1,ECU2;" in text
+
+
+def _message_reference_db(*, is_extended_frame: bool) -> Database:
+    arbitration_id = 0x321
+    signal = Signal(
+        name="State",
+        start_bit=0,
+        length=32,
+        receivers=["ECU2"],
+        comment="signal comment",
+        value_table=ValueTable(name="StateValues", values={0: "Off", 1: "On"}),
+        attributes={"SignalAttr": 9},
+        signal_type=1,
+    )
+    message = Message(
+        arbitration_id=arbitration_id,
+        name="ReferenceMessage",
+        length=8,
+        is_extended_frame=is_extended_frame,
+        senders=["ECU1", "ECU2"],
+        signals={signal.name: signal},
+        comment="message comment",
+        attributes={"MessageAttr": 7},
+        cycle_time=25,
+    )
+    attributes = {
+        "GenMsgCycleTime": AttributeDefinition(
+            name="GenMsgCycleTime",
+            kind=AttributeKind.INT,
+            object_type="BO_",
+            minimum=0,
+            maximum=1000,
+        ),
+        "MessageAttr": AttributeDefinition(
+            name="MessageAttr",
+            kind=AttributeKind.INT,
+            object_type="BO_",
+            minimum=0,
+            maximum=10,
+        ),
+        "SignalAttr": AttributeDefinition(
+            name="SignalAttr",
+            kind=AttributeKind.INT,
+            object_type="SG_",
+            minimum=0,
+            maximum=10,
+        ),
+    }
+    group = SignalGroup(
+        name="Status",
+        message_id=arbitration_id,
+        signal_names=[signal.name],
+    )
+    return Database(
+        messages={arbitration_id: message},
+        attributes=attributes,
+        signal_groups=[group],
+    )
+
+
+def _assert_message_reference_ids(text: str, expected_id: int) -> None:
+    expected_lines = (
+        f"BO_ {expected_id} ReferenceMessage: 8 ECU1",
+        f"BO_TX_BU_ {expected_id} : ECU1,ECU2;",
+        f'CM_ BO_  {expected_id} "message comment";',
+        f'CM_ SG_  {expected_id} State "signal comment";',
+        f'BA_ "GenMsgCycleTime" BO_ {expected_id} 25;',
+        f'BA_ "MessageAttr" BO_ {expected_id} 7;',
+        f'BA_ "SignalAttr" SG_ {expected_id} State 9;',
+        f'VAL_ {expected_id} State 0 "Off" 1 "On" ;',
+        f"SIG_GROUP_ {expected_id} Status 1 : State;",
+        f"SIG_VALTYPE_ {expected_id} State : 1 ;",
+    )
+    for expected in expected_lines:
+        assert expected in text
+
+
+def test_extended_frame_references_serialized_with_high_bit_and_roundtrip():
+    arbitration_id = 0x321
+    flagged_id = arbitration_id | 0x80000000
+    db = _message_reference_db(is_extended_frame=True)
+    before = db.model_dump()
+
+    text = dump(db)
+
+    _assert_message_reference_ids(text, flagged_id)
+    assert db.model_dump() == before
+
+    reparsed = dbckit.parse(text)
+    message = reparsed.messages[arbitration_id]
+    assert message.is_extended_frame is True
+    assert message.senders == ["ECU1", "ECU2"]
+    assert message.comment == "message comment"
+    assert message.cycle_time == 25
+    assert message.attributes["MessageAttr"] == 7
+    signal = message.signals["State"]
+    assert signal.comment == "signal comment"
+    assert signal.attributes["SignalAttr"] == 9
+    assert signal.signal_type == 1
+    assert signal.value_table is not None
+    assert signal.value_table.values == {0: "Off", 1: "On"}
+    assert reparsed.signal_groups[0].message_id == arbitration_id
+
+
+def test_standard_frame_references_serialized_without_high_bit():
+    arbitration_id = 0x321
+    flagged_id = arbitration_id | 0x80000000
+
+    text = dump(_message_reference_db(is_extended_frame=False))
+
+    _assert_message_reference_ids(text, arbitration_id)
+    assert str(flagged_id) not in text
+
+
+def test_dangling_signal_group_serialized_without_guessing_extended_flag():
+    message_id = 0x18FF1234
+    group = SignalGroup(name="Dangling", message_id=message_id)
+
+    text = dump(Database(signal_groups=[group]))
+
+    assert f"SIG_GROUP_ {message_id} Dangling 1 : ;" in text
+    assert str(message_id | 0x80000000) not in text
 
 
 def test_standard_frame_serialized_without_high_bit():

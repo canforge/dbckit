@@ -15,6 +15,9 @@ Versioning follows [Semantic Versioning](https://semver.org/) from 1.0.0 onward.
   reference, so comments, attributes, value mappings, signal types,
   transmitters, and signal groups resolve or store the clean arbitration ID
   without creating duplicate message keys.
+- Reapply the extended-frame flag across every serializer-side message
+  reference, so emitted comments, attributes, value mappings, signal types,
+  transmitters, and signal groups use the same DBC wire ID as `BO_`.
 
 ## [1.0.0] — 2026-07-15
 
