@@ -158,7 +158,21 @@ BU_ :
     assert reparsed.ns_values == db.ns_values
 
 
-def test_split_value_table_after_namespace_round_trips():
+def test_value_table_namespace_token_is_not_misclassified():
+    dbc = """\
+VERSION ""
+NS_ :
+    VAL_TABLE_
+    NS_DESC_
+BS_ :
+BU_ :
+"""
+
+    db = dbckit.parse(dbc)
+    assert db.ns_values == ["VAL_TABLE_", "NS_DESC_"]
+
+
+def test_three_line_split_value_table_after_namespace_round_trips():
     dbc = """\
 VERSION ""
 NS_ :
@@ -166,6 +180,27 @@ NS_ :
     CM_
 VAL_TABLE_
 SwitchStates
+0 "Off" 1 "On";
+BS_ :
+BU_ :
+"""
+
+    db = dbckit.parse(dbc)
+    assert db.ns_values == ["NS_DESC_", "CM_"]
+    assert db.value_tables["SwitchStates"].values == {0: "Off", 1: "On"}
+
+    reparsed = dbckit.parse(dbckit.dump(db))
+    assert reparsed.ns_values == db.ns_values
+    assert reparsed.value_tables == db.value_tables
+
+
+def test_two_line_split_value_table_after_namespace_round_trips():
+    dbc = """\
+VERSION ""
+NS_ :
+    NS_DESC_
+    CM_
+VAL_TABLE_ SwitchStates
 0 "Off" 1 "On";
 BS_ :
 BU_ :
