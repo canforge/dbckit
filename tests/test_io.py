@@ -50,3 +50,27 @@ def test_save_accepts_explicit_encoding(tmp_path: Path):
     db.save(output, encoding="cp1252")
 
     assert b"\xb0C" in output.read_bytes()
+
+
+def test_load_threads_lenient_policy_and_preserves_filename(tmp_path: Path):
+    source = tmp_path / "extended-mux.dbc"
+    source.write_text(
+        'VERSION ""\nNS_ :\nBS_ :\nBU_ : ECU\n'
+        'BO_ 100 Message: 8 ECU\n'
+        ' SG_ Kept : 0|8@1+ (1,0) [0|255] "" ECU\n'
+        'SG_MUL_VAL_ 100 Kept Kept 0-1;\n',
+        encoding="utf-8",
+    )
+
+    db = dbckit.load(source, on_unsupported="skip")
+
+    assert db.filename == str(source)
+    assert db.parse_diagnostics[0].construct == "SG_MUL_VAL_"
+    assert db.decode_safe is False
+
+
+def test_load_rejects_invalid_unsupported_policy_before_reading(tmp_path: Path):
+    missing = tmp_path / "missing.dbc"
+
+    with pytest.raises(ValueError, match="on_unsupported"):
+        dbckit.load(missing, on_unsupported="collect")

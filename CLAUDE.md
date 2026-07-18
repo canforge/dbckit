@@ -62,9 +62,10 @@ DBC text ──normalize()──> parser/dbc.lark + parser/grammar.py (Lark → 
 
 These fail loudly by design — "fixing" them is a roadmap decision, not a bug fix:
 
-- Extended multiplexing (`m0M`, `SG_MUL_VAL_`) is rejected at parse time.
-- Dangling `CM_`/`BA_`/`VAL_`/`SIG_VALTYPE_`/`ENVVAR_DATA_` references raise instead of
-  being dropped (lenient mode is planned — see ROADMAP.md).
+- Extended multiplexing (`m0M`, `SG_MUL_VAL_`) is rejected by default; opt-in
+  `on_unsupported="skip"` isolates line-bounded forms with decode diagnostics.
+- Dangling `CM_`/`BA_`/`VAL_`/`SIG_VALTYPE_`/`ENVVAR_DATA_` references raise by
+  default and become structured cosmetic diagnostics in skip mode.
 - J1939 helpers read explicit `PGN`/`SPN` attribute values only; no 29-bit ID math yet.
 - CAN FD untested; `.sym`/`.kcd`/ARXML out of scope.
 

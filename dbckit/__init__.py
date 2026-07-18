@@ -14,6 +14,7 @@ from dbckit.model.database import (
     Database,
     Issue,
     Node,
+    ParseDiagnostic,
 )
 from dbckit.model.message import Message
 from dbckit.model.signal import BitSlot, ByteOrder, Signal, SignalGroup, ValueTable
@@ -42,6 +43,7 @@ from dbckit.operations import (
     search_signals,
 )
 from dbckit.parser.grammar import parse_string
+from dbckit.parser.preprocessor import UnsupportedPolicy
 from dbckit.parser.tokenizer import normalize
 from dbckit.serializer import dump
 from dbckit.validator import validate
@@ -53,7 +55,7 @@ __all__ = [
     # models
     "Database", "Message", "Signal", "SignalGroup", "Node",
     "ByteOrder", "ValueTable", "BitSlot",
-    "AttributeDefinition", "AttributeKind", "Issue",
+    "AttributeDefinition", "AttributeKind", "Issue", "ParseDiagnostic",
     # views
     "MessageView", "SignalView", "NodeView",
     # parse / io
@@ -74,6 +76,10 @@ __all__ = [
 ]
 
 
-def parse(text: str) -> Database:
+def parse(
+    text: str,
+    *,
+    on_unsupported: UnsupportedPolicy = "raise",
+) -> Database:
     """Parse a DBC-formatted string and return a Database model."""
-    return parse_string(normalize(text))
+    return parse_string(normalize(text), on_unsupported=on_unsupported)

@@ -19,9 +19,16 @@ from dbckit.model.database import (
     Database,
     EnvironmentVariable,
     Node,
+    ParseDiagnostic,
 )
 from dbckit.model.message import Message
 from dbckit.model.signal import ByteOrder, Signal, SignalGroup, ValueTable
+
+from .preprocessor import (
+    UnsupportedPolicy,
+    preprocess_unsupported,
+    validate_unsupported_policy,
+)
 
 
 def _load_grammar() -> str:
@@ -61,6 +68,14 @@ def _float(token: Any) -> float:
     return float(str(token))
 
 
+def _line(items: list[Any]) -> int:
+    for item in items:
+        line = getattr(item, "line", None)
+        if line is not None:
+            return int(line)
+    raise ValueError("Parser token is missing source line metadata")
+
+
 def _coerce_attr(raw: Any, kind: AttributeKind) -> Any:
     s = str(raw)
     if kind == AttributeKind.STRING:
@@ -84,39 +99,115 @@ def _coerce_attr(raw: Any, kind: AttributeKind) -> Any:
 class DBCTransformer(Transformer):
     """Transforms a Lark parse tree into a Database model."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        on_unsupported: UnsupportedPolicy = "raise",
+        diagnostics: list[ParseDiagnostic] | None = None,
+    ) -> None:
         super().__init__()
         self._db = Database()
+        self._on_unsupported = on_unsupported
+        self._diagnostics = diagnostics if diagnostics is not None else []
 
-    def _require_message(self, arb_id: int, section: str) -> Message:
+    def _require_message(
+        self,
+        arb_id: int,
+        section: str,
+        line: int,
+        *,
+        signal_name: str | None = None,
+    ) -> Message | None:
         msg = self._db.messages.get(arb_id)
         if msg is None:
-            raise ValueError(
+            detail = (
                 f"{section} references unknown message arbitration_id={arb_id:#x}"
+            )
+            if self._on_unsupported == "raise":
+                raise ValueError(detail)
+            self._diagnose(
+                section,
+                line,
+                detail,
+                message_id=arb_id,
+                signal_name=signal_name,
             )
         return msg
 
     def _require_signal(
-        self, arb_id: int, sig_name: str, section: str
-    ) -> tuple[Message, Signal]:
-        msg = self._require_message(arb_id, section)
+        self,
+        arb_id: int,
+        sig_name: str,
+        section: str,
+        line: int,
+    ) -> tuple[Message, Signal] | None:
+        msg = self._require_message(
+            arb_id,
+            section,
+            line,
+            signal_name=sig_name,
+        )
+        if msg is None:
+            return None
         sig = msg.signals.get(sig_name)
         if sig is None:
-            raise ValueError(
+            detail = (
                 f"{section} references unknown signal '{sig_name}' in message "
                 f"arbitration_id={arb_id:#x}"
             )
+            if self._on_unsupported == "raise":
+                raise ValueError(detail)
+            self._diagnose(
+                section,
+                line,
+                detail,
+                message_id=arb_id,
+                signal_name=sig_name,
+            )
+            return None
         return msg, sig
 
-    def _require_envvar(self, name: str, section: str) -> EnvironmentVariable:
+    def _require_envvar(
+        self,
+        name: str,
+        section: str,
+        line: int,
+    ) -> EnvironmentVariable | None:
         envvar = self._db.environment_variables.get(name)
         if envvar is None:
-            raise ValueError(
+            detail = (
                 f"{section} references unknown environment variable '{name}'"
             )
+            if self._on_unsupported == "raise":
+                raise ValueError(detail)
+            self._diagnose(section, line, detail)
         return envvar
 
+    def _diagnose(
+        self,
+        construct: str,
+        line: int,
+        detail: str,
+        *,
+        message_id: int | None = None,
+        signal_name: str | None = None,
+    ) -> None:
+        self._diagnostics.append(
+            ParseDiagnostic(
+                construct=construct,
+                line=line,
+                message_id=message_id,
+                signal_name=signal_name,
+                effect="cosmetic",
+                detail=detail,
+            )
+        )
+
     def start(self, items: list) -> Database:
+        self._db.parse_diagnostics = sorted(
+            self._diagnostics,
+            key=lambda diagnostic: diagnostic.line,
+        )
         return self._db
 
     # ── VERSION ──────────────────────────────────────────────────────────
@@ -225,10 +316,18 @@ class DBCTransformer(Transformer):
         arb_id, _ = decode_dbc_frame_id(_int(items[0]))
         senders = [str(t) for t in items[1:]]
         msg = self._db.messages.get(arb_id)
-        if msg is not None:
-            self._db.messages[msg.arbitration_id] = msg.model_copy(
-                update={"senders": senders}
-            )
+        if msg is None:
+            if self._on_unsupported == "skip":
+                self._diagnose(
+                    "BO_TX_BU_",
+                    _line(items),
+                    f"BO_TX_BU_ references unknown message arbitration_id={arb_id:#x}",
+                    message_id=arb_id,
+                )
+            return
+        self._db.messages[msg.arbitration_id] = msg.model_copy(
+            update={"senders": senders}
+        )
 
     # ── SIG_GROUP_ ───────────────────────────────────────────────────────
     def sig_group_section(self, items: list) -> None:
@@ -236,6 +335,34 @@ class DBCTransformer(Transformer):
         name = str(items[1])
         repetitions = _int(items[2])
         signal_names = [str(t) for t in items[3:]]
+        if self._on_unsupported == "skip":
+            msg = self._db.messages.get(msg_id)
+            if msg is None:
+                self._diagnose(
+                    "SIG_GROUP_",
+                    _line(items),
+                    f"SIG_GROUP_ references unknown message arbitration_id={msg_id:#x}",
+                    message_id=msg_id,
+                )
+                return
+            missing_signals = [
+                signal_name
+                for signal_name in signal_names
+                if signal_name not in msg.signals
+            ]
+            for signal_name in missing_signals:
+                self._diagnose(
+                    "SIG_GROUP_",
+                    _line(items),
+                    (
+                        f"SIG_GROUP_ references unknown signal '{signal_name}' in "
+                        f"message arbitration_id={msg_id:#x}"
+                    ),
+                    message_id=msg_id,
+                    signal_name=signal_name,
+                )
+            if missing_signals:
+                return
         self._db.signal_groups.append(
             SignalGroup(
                 name=name,
@@ -248,7 +375,9 @@ class DBCTransformer(Transformer):
     # ── CM_ comments ─────────────────────────────────────────────────────
     def msg_comment(self, items: list) -> None:
         arb_id, _ = decode_dbc_frame_id(_int(items[0]))
-        msg = self._require_message(arb_id, "CM_")
+        msg = self._require_message(arb_id, "CM_", _line(items))
+        if msg is None:
+            return
         self._db.messages[msg.arbitration_id] = msg.model_copy(
             update={"comment": _str(items[1])}
         )
@@ -256,7 +385,10 @@ class DBCTransformer(Transformer):
     def sig_comment(self, items: list) -> None:
         arb_id, _ = decode_dbc_frame_id(_int(items[0]))
         sig_name = str(items[1])
-        msg, sig = self._require_signal(arb_id, sig_name, "CM_")
+        target = self._require_signal(arb_id, sig_name, "CM_", _line(items))
+        if target is None:
+            return
+        msg, sig = target
         msg.signals[sig_name] = sig.model_copy(update={"comment": _str(items[2])})
 
     def node_comment(self, items: list) -> None:
@@ -267,7 +399,9 @@ class DBCTransformer(Transformer):
 
     def envvar_comment(self, items: list) -> None:
         name = str(items[0])
-        envvar = self._require_envvar(name, "CM_")
+        envvar = self._require_envvar(name, "CM_", _line(items))
+        if envvar is None:
+            return
         self._db.environment_variables[name] = envvar.model_copy(
             update={"comment": _str(items[1])}
         )
@@ -367,7 +501,10 @@ class DBCTransformer(Transformer):
 
     def _apply_msg_attr(self, name: str, raw_id: int, raw: Any) -> None:
         arb_id, _ = decode_dbc_frame_id(raw_id)
-        msg = self._require_message(arb_id, "BA_")
+        line = int(getattr(raw, "line", 0))
+        msg = self._require_message(arb_id, "BA_", line)
+        if msg is None:
+            return
         ad = self._db.attributes.get(name)
         if name == CYCLE_TIME_ATTRIBUTE:
             val = (
@@ -391,7 +528,11 @@ class DBCTransformer(Transformer):
 
     def _apply_sig_attr(self, name: str, raw_id: int, sig_name: str, raw: Any) -> None:
         arb_id, _ = decode_dbc_frame_id(raw_id)
-        _, sig = self._require_signal(arb_id, sig_name, "BA_")
+        line = int(getattr(raw, "line", 0))
+        target = self._require_signal(arb_id, sig_name, "BA_", line)
+        if target is None:
+            return
+        _, sig = target
         ad = self._db.attributes.get(name)
         val = _coerce_attr(raw, ad.kind if ad else AttributeKind.STRING)
         sig.attributes[name] = val
@@ -403,7 +544,10 @@ class DBCTransformer(Transformer):
         self._apply_env_attr(_str(items[0]), str(items[1]), items[2])
 
     def _apply_env_attr(self, name: str, ev_name: str, raw: Any) -> None:
-        envvar = self._require_envvar(ev_name, "BA_")
+        line = int(getattr(raw, "line", 0))
+        envvar = self._require_envvar(ev_name, "BA_", line)
+        if envvar is None:
+            return
         ad = self._db.attributes.get(name)
         val = _coerce_attr(raw, ad.kind if ad else AttributeKind.STRING)
         envvar.attributes[name] = val
@@ -424,7 +568,10 @@ class DBCTransformer(Transformer):
     def signal_val(self, items: list) -> None:
         arb_id, _ = decode_dbc_frame_id(_int(items[0]))
         sig_name = str(items[1])
-        msg, sig = self._require_signal(arb_id, sig_name, "VAL_")
+        target = self._require_signal(arb_id, sig_name, "VAL_", _line(items))
+        if target is None:
+            return
+        msg, sig = target
         vals: dict[int, str] = {}
         for i in range(2, len(items), 2):
             vals[_int(items[i])] = _str(items[i + 1])
@@ -433,7 +580,9 @@ class DBCTransformer(Transformer):
 
     def table_val(self, items: list) -> None:
         name = str(items[0])
-        envvar = self._require_envvar(name, "VAL_")
+        envvar = self._require_envvar(name, "VAL_", _line(items))
+        if envvar is None:
+            return
         vals: dict[int, str] = {}
         for i in range(1, len(items), 2):
             vals[_int(items[i])] = _str(items[i + 1])
@@ -446,7 +595,15 @@ class DBCTransformer(Transformer):
         arb_id, _ = decode_dbc_frame_id(_int(items[0]))
         sig_name = str(items[1])
         sig_type = _int(items[2])
-        msg, sig = self._require_signal(arb_id, sig_name, "SIG_VALTYPE_")
+        target = self._require_signal(
+            arb_id,
+            sig_name,
+            "SIG_VALTYPE_",
+            _line(items),
+        )
+        if target is None:
+            return
+        msg, sig = target
         msg.signals[sig_name] = sig.model_copy(update={"signal_type": sig_type})
 
     def envvar_section(self, items: list) -> None:
@@ -467,29 +624,31 @@ class DBCTransformer(Transformer):
     def envvar_data_section(self, items: list) -> None:
         name = str(items[0])
         size = _int(items[1])
-        envvar = self._require_envvar(name, "ENVVAR_DATA_")
+        envvar = self._require_envvar(name, "ENVVAR_DATA_", _line(items))
+        if envvar is None:
+            return
         self._db.environment_variables[name] = envvar.model_copy(
             update={"data_size": size}
         )
 
 
-def parse_string(text: str) -> Database:
+def parse_string(
+    text: str,
+    *,
+    on_unsupported: UnsupportedPolicy = "raise",
+) -> Database:
     """Parse a DBC-formatted string and return a Database model."""
-    for line_number, line in enumerate(text.splitlines(), start=1):
-        parts = line.lstrip().split(maxsplit=1)
-        is_extended_mux_statement = (
-            parts[:1] == ["SG_MUL_VAL_"]
-            and len(parts) > 1
-            and bool(parts[1].split("//", maxsplit=1)[0].strip())
-        )
-        if is_extended_mux_statement:
-            raise ValueError(
-                f"Unsupported DBC construct 'SG_MUL_VAL_' at line {line_number}: "
-                "extended multiplexing ranges are not supported"
-            )
-    tree = get_parser().parse(text)
+    policy = validate_unsupported_policy(on_unsupported)
+    processed_text, diagnostics = preprocess_unsupported(
+        text,
+        on_unsupported=policy,
+    )
+    tree = get_parser().parse(processed_text)
     try:
-        return DBCTransformer().transform(tree)
+        return DBCTransformer(
+            on_unsupported=policy,
+            diagnostics=diagnostics,
+        ).transform(tree)
     except VisitError as exc:
         if isinstance(exc.orig_exc, ValueError):
             raise exc.orig_exc from None

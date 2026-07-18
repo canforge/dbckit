@@ -55,7 +55,7 @@ cannot load at all — which pushes clients into stripping sections to work arou
 Depends on 1.0.1: the `PGN`/`ProtocolType` attributes that drive J1939 auto-detection
 live in exactly the `BA_` lines that currently fail to parse on extended-ID files.
 
-- [ ] Lenient parsing with diagnostics: `parse(text, on_unsupported="raise" | "skip")`,
+- [x] Lenient parsing with diagnostics: `parse(text, on_unsupported="raise" | "skip")`,
   default `"raise"` so 1.0 behavior is unchanged. Each skipped construct or dangling
   reference records a structured diagnostic (construct, line, affected message/signal,
   `effect: decode_degraded | cosmetic`); decode-safety is tracked per message with a

@@ -87,6 +87,10 @@ db = dbckit.load("vehicle.dbc", encoding="latin-1")
 dbckit.save(db, "copy.dbc", encoding="utf-8")
 ```
 
+For bounded unsupported constructs, `on_unsupported="skip"` returns the
+parseable model with structured diagnostics and decode-safety rollups; see the
+[API reference](docs/api-reference.md#lenient-parsing-and-decode-safety).
+
 ### Codec
 
 Message-level `decode_frame()` / `encode_frame()` and signal-level

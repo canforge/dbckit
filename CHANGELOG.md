@@ -9,6 +9,14 @@ Versioning follows [Semantic Versioning](https://semver.org/) from 1.0.0 onward.
 
 ## [Unreleased]
 
+### Added
+
+- Add opt-in lenient parsing with `on_unsupported="skip"` on `parse()`,
+  `parse_string()`, and `load()`. Safely bounded extended-multiplexing syntax and
+  dangling references produce ordered, structured parse diagnostics with
+  per-message and global decode-safety rollups; strict behavior remains the
+  default.
+
 ### Changed
 
 - Replace the Earley DBC parser with LALR and a contextual lexer, preserving

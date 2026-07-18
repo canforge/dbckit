@@ -100,8 +100,11 @@ value raises `ValueError`.
 
 - Extended multiplexing (``m0M``-style nested selectors) is not supported by
   ``decode_frame`` / ``encode_frame``. Inline nested selectors and
-  `SG_MUL_VAL_` range statements are rejected with clear parser errors. A bare
-  `SG_MUL_VAL_` capability token inside `NS_` is accepted and round-tripped.
+  `SG_MUL_VAL_` range statements are rejected with clear parser errors in the
+  default strict mode. With `on_unsupported="skip"`, a line-bounded nested
+  signal or range statement is omitted with a `decode_degraded` diagnostic for
+  its message and signal. A bare `SG_MUL_VAL_` capability token inside `NS_` is
+  accepted and round-tripped.
 
 ## CAN and format scope
 
@@ -162,17 +165,34 @@ Sender and receiver references are validated by `MISSING_SENDER` and
 
 ## Known parser and serializer edge cases
 
+`parse()` and `load()` default to `on_unsupported="raise"`, preserving strict
+1.0 behavior. `on_unsupported="skip"` is deliberately narrow: it skips only
+safely bounded extended-multiplexing syntax and dangling references understood
+by the parser. Every omission produces an ordered `Database.parse_diagnostics`
+entry with its construct, one-based line, affected message/signal when known,
+effect, and detail. Unknown or unbounded syntax still raises.
+
+Skipped extended-multiplexing semantics are `decode_degraded`. Dangling
+references, comments, transmitter metadata, signal groups, and environment-only
+metadata are `cosmetic` because they remove no decode semantics from a surviving
+message. `Database.decode_safe` and the per-message helpers derive their values
+from these effects. Diagnostics are parse metadata: `dump()` does not serialize
+them and `diff()` ignores them.
+
 - **Determinism:** serializer output is deterministic; section and entry order is stable
   across repeated calls on the same `Database` object.
-- **Unknown sections:** DBC sections not listed above will cause a parse error if encountered
-  inline; they are not silently skipped. An `SG_MUL_VAL_` range statement receives a targeted
-  unsupported-feature error rather than a raw Lark syntax error; the bare `NS_` capability
-  token is supported.
-- **Dangling references:** the parser strictly rejects `CM_`, `BA_`, `VAL_`,
+- **Unknown sections:** DBC sections not listed above cause a parse error even in
+  skip mode; they are never silently skipped. An `SG_MUL_VAL_` range statement
+  receives a targeted unsupported-feature error in strict mode; the bare `NS_`
+  capability token is supported.
+- **Dangling references:** strict mode rejects `CM_`, `BA_`, `VAL_`,
   `SIG_VALTYPE_`, and `ENVVAR_DATA_` entries that refer to an unknown message,
   signal, or environment variable. References are resolved in source order, so the
-  referenced object must be declared before the referencing entry. The diagnostic
-  identifies the section and missing target and is raised as `ValueError`.
+  referenced object must be declared before the referencing entry. The error
+  identifies the section and missing target and is raised as `ValueError`. Skip
+  mode declines the update and records a cosmetic diagnostic; it also diagnoses
+  missing `BO_TX_BU_` and `SIG_GROUP_` targets without changing their legacy
+  strict behavior.
 - **Duplicate message IDs in source:** the last `BO_` definition wins (parser overwrites).
 - **Extended frames:** `Message.is_extended_frame` records the DBC bit-31 convention;
   parsing strips the marker from message definitions and references, while

@@ -5,6 +5,7 @@ from .database import (
     EnvironmentVariable,
     Issue,
     Node,
+    ParseDiagnostic,
 )
 from .message import Message
 from .signal import BitSlot, ByteOrder, Signal, SignalGroup, ValueTable
@@ -16,6 +17,7 @@ __all__ = [
     "EnvironmentVariable",
     "Issue",
     "Node",
+    "ParseDiagnostic",
     "Message",
     "BitSlot",
     "ByteOrder",

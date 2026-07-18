@@ -156,6 +156,76 @@ SG_MUL_VAL_ 100 ExistingSignal ExistingSignal 0-1;
         dbckit.parse(dbc)
 
 
+def test_skip_extended_mux_records_ordered_degrading_diagnostics():
+    dbc = (
+        '\ufeffVERSION ""\r\n'
+        "NS_ :\r\n"
+        "BS_ :\r\n"
+        "BU_ : ECU\r\n"
+        "BO_ 100 ExtendedMux: 8 ECU\r\n"
+        '\tSG_ Kept : 0|8@1+ (1,0) [0|255] "" ECU\r\n'
+        '\tSG_ Variant m0M : 8|8@1+ (1,0) [0|255] "" ECU\r\n'
+        'CM_ SG_ 100 Missing "dangling";\r\n'
+        "SG_MUL_VAL_ 100 Kept Kept 0-1;\r\n"
+    )
+
+    db = dbckit.parse(dbc, on_unsupported="skip")
+
+    assert list(db.messages[100].signals) == ["Kept"]
+    assert [diagnostic.construct for diagnostic in db.parse_diagnostics] == [
+        "SG_",
+        "CM_",
+        "SG_MUL_VAL_",
+    ]
+    assert [diagnostic.line for diagnostic in db.parse_diagnostics] == [7, 8, 9]
+    assert db.parse_diagnostics[0].message_id == 100
+    assert db.parse_diagnostics[0].signal_name == "Variant"
+    assert db.parse_diagnostics[0].effect == "decode_degraded"
+    assert db.parse_diagnostics[1].effect == "cosmetic"
+    assert db.parse_diagnostics[2].effect == "decode_degraded"
+    assert db.decode_safe is False
+    assert db.message_decode_safety == {100: False}
+    assert db.message_decode_safe(100) is False
+    assert db.is_message_decode_safe(100) is False
+
+
+def test_skip_extended_mux_diagnostics_are_parse_metadata_only():
+    dbc = f"""\
+{MINIMAL_DBC}
+SG_MUL_VAL_ 100 ExistingSignal ExistingSignal 0-1;
+"""
+
+    parsed = dbckit.parse(dbc, on_unsupported="skip")
+    dumped = dbckit.dump(parsed)
+    reparsed = dbckit.parse(dumped)
+
+    assert parsed.parse_diagnostics
+    assert "SG_MUL_VAL_" not in dumped
+    assert reparsed.parse_diagnostics == []
+    assert reparsed.messages == parsed.messages
+    assert parsed.diff(reparsed).is_empty
+
+
+def test_skip_refuses_unknown_or_unbounded_syntax():
+    with pytest.raises(Exception):
+        dbckit.parse(f"{MINIMAL_DBC}\nUNKNOWN_SECTION_ 100;\n", on_unsupported="skip")
+
+    with pytest.raises(ValueError, match="Unsupported DBC construct 'SG_MUL_VAL_'"):
+        dbckit.parse(
+            f"{MINIMAL_DBC}\nSG_MUL_VAL_ cannot_be_safely_scoped;\n",
+            on_unsupported="skip",
+        )
+
+
+@pytest.mark.parametrize("policy", ["", "collect", "ignore"])
+def test_invalid_unsupported_policy_raises_before_parsing(policy: str):
+    with pytest.raises(
+        ValueError,
+        match="on_unsupported must be 'raise' or 'skip'",
+    ):
+        dbckit.parse("not valid DBC", on_unsupported=policy)
+
+
 def test_extended_frame_references_use_clean_arbitration_id():
     dbc = f"""\
 VERSION ""
@@ -319,6 +389,70 @@ def test_flagged_reference_matches_standard_message_by_clean_id():
 def test_dangling_reference_raises(entry: str, error: str):
     with pytest.raises(Exception, match=re.escape(error)):
         dbckit.parse(f"{MINIMAL_DBC}\n{entry}\n")
+
+
+@pytest.mark.parametrize(
+    ("entry", "construct", "message_id", "signal_name"),
+    [
+        ('CM_ BO_ 999 "comment";', "CM_", 999, None),
+        ('CM_ SG_ 100 MissingSignal "comment";', "CM_", 100, "MissingSignal"),
+        ('CM_ EV_ MissingEnvvar "comment";', "CM_", None, None),
+        ('BA_ "Attr" BO_ 999 1;', "BA_", 999, None),
+        ('BA_ "Attr" SG_ 100 MissingSignal 1;', "BA_", 100, "MissingSignal"),
+        ('BA_ "Attr" EV_ MissingEnvvar 1;', "BA_", None, None),
+        ('VAL_ 100 MissingSignal 0 "Off";', "VAL_", 100, "MissingSignal"),
+        ('VAL_ 999 MissingSignal 0 "Off";', "VAL_", 999, "MissingSignal"),
+        ("SIG_VALTYPE_ 100 MissingSignal : 1;", "SIG_VALTYPE_", 100, "MissingSignal"),
+        ("ENVVAR_DATA_ MissingEnvvar : 8;", "ENVVAR_DATA_", None, None),
+        ("BO_TX_BU_ 999 : ECU;", "BO_TX_BU_", 999, None),
+        ("SIG_GROUP_ 999 MissingGroup 1 : MissingSignal;", "SIG_GROUP_", 999, None),
+        ("SIG_GROUP_ 100 MissingGroup 1 : MissingSignal;", "SIG_GROUP_", 100, "MissingSignal"),
+    ],
+)
+def test_skip_dangling_reference_records_cosmetic_diagnostic(
+    entry: str,
+    construct: str,
+    message_id: int | None,
+    signal_name: str | None,
+):
+    db = dbckit.parse(f"{MINIMAL_DBC}\n{entry}\n", on_unsupported="skip")
+
+    assert len(db.parse_diagnostics) == 1
+    diagnostic = db.parse_diagnostics[0]
+    assert diagnostic.construct == construct
+    assert diagnostic.line == 8
+    assert diagnostic.message_id == message_id
+    assert diagnostic.signal_name == signal_name
+    assert diagnostic.effect == "cosmetic"
+    assert diagnostic.detail
+    assert db.decode_safe is True
+    assert db.message_decode_safe(100) is True
+
+
+def test_skip_forward_reference_is_diagnosed_in_source_order():
+    dbc = """\
+VERSION ""
+NS_ :
+BS_ :
+BU_ : ECU
+CM_ BO_ 100 "defined later";
+BO_ 100 DefinedLater: 8 ECU
+"""
+
+    db = dbckit.parse(dbc, on_unsupported="skip")
+
+    assert db.messages[100].comment is None
+    assert len(db.parse_diagnostics) == 1
+    assert db.parse_diagnostics[0].line == 5
+    assert db.parse_diagnostics[0].message_id == 100
+    assert db.decode_safe is True
+
+
+def test_message_decode_safe_rejects_unknown_message():
+    db = dbckit.parse(MINIMAL_DBC)
+
+    with pytest.raises(KeyError, match="arbitration_id=0x3e7"):
+        db.message_decode_safe(999)
 
 
 def test_parse_big_endian_signal():

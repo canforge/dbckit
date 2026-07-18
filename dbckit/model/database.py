@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
@@ -75,6 +76,27 @@ class Issue(BaseModel):
     message: str
 
 
+with warnings.catch_warnings():
+    # Pydantic retains a deprecated BaseModel.construct() compatibility method;
+    # the public diagnostic field name is part of dbckit's API contract.
+    warnings.filterwarnings(
+        "ignore",
+        message='Field name "construct" in "ParseDiagnostic" shadows an attribute',
+    )
+
+    class ParseDiagnostic(BaseModel):
+        """A construct skipped while parsing a DBC source in lenient mode."""
+
+        construct: str  # type: ignore[assignment]
+        line: int
+        message_id: Optional[int] = None
+        signal_name: Optional[str] = None
+        effect: Literal["decode_degraded", "cosmetic"]
+        detail: str
+
+        model_config = {"extra": "forbid"}
+
+
 class Database(BaseModel):
     """Top-level DBC database."""
 
@@ -93,8 +115,47 @@ class Database(BaseModel):
     bit_timing: Optional[str] = None
     # Catch-all for non-standard / future sections
     dbc_specific: dict[str, Any] = Field(default_factory=dict)
+    # Source metadata; deliberately ignored by DBC serialization and semantic diffing.
+    parse_diagnostics: list[ParseDiagnostic] = Field(default_factory=list)
 
     model_config = {"extra": "forbid"}
+
+    @property
+    def decode_safe(self) -> bool:
+        """Whether parsing retained all decode-affecting semantics."""
+        return all(
+            diagnostic.effect != "decode_degraded"
+            for diagnostic in self.parse_diagnostics
+        )
+
+    @property
+    def is_decode_safe(self) -> bool:
+        """Alias for :attr:`decode_safe`."""
+        return self.decode_safe
+
+    @property
+    def message_decode_safety(self) -> dict[int, bool]:
+        """Derived decode-safety state for every parsed message."""
+        degraded_ids = {
+            diagnostic.message_id
+            for diagnostic in self.parse_diagnostics
+            if diagnostic.effect == "decode_degraded"
+            and diagnostic.message_id is not None
+        }
+        return {
+            arbitration_id: arbitration_id not in degraded_ids
+            for arbitration_id in self.messages
+        }
+
+    def message_decode_safe(self, arbitration_id: int) -> bool:
+        """Return whether parsing retained decode semantics for one message."""
+        if arbitration_id not in self.messages:
+            raise KeyError(f"No message with arbitration_id={arbitration_id:#x}")
+        return self.message_decode_safety[arbitration_id]
+
+    def is_message_decode_safe(self, arbitration_id: int) -> bool:
+        """Alias for :meth:`message_decode_safe`."""
+        return self.message_decode_safe(arbitration_id)
 
     # ── navigation ────────────────────────────────────────────────────────────
 

@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 import dbckit
-from dbckit import Database, Message, Node, Signal
+from dbckit import Database, Message, Node, ParseDiagnostic, Signal
 from dbckit.model.database import AttributeDefinition, AttributeKind
 from dbckit.views import MessageView, NodeView, SignalView
 
@@ -103,9 +103,41 @@ class TestModuleExports:
             "decode_log",
             "FrameLike",
             "codegen",
+            "ParseDiagnostic",
         ):
             assert hasattr(dbckit, name)
             assert name in dbckit.__all__
+
+    def test_parse_diagnostic_model_is_public(self):
+        diagnostic = ParseDiagnostic(
+            construct="SG_",
+            line=7,
+            message_id=100,
+            signal_name="Variant",
+            effect="decode_degraded",
+            detail="unsupported extended multiplexing",
+        )
+
+        assert diagnostic.construct == "SG_"
+
+    def test_unscoped_degrading_diagnostic_makes_global_rollup_unsafe(self):
+        db = Database(
+            messages={
+                100: Message(arbitration_id=100, name="Message", length=8),
+            },
+            parse_diagnostics=[
+                ParseDiagnostic(
+                    construct="SG_",
+                    line=1,
+                    effect="decode_degraded",
+                    detail="unscoped decode semantics were skipped",
+                )
+            ],
+        )
+
+        assert db.decode_safe is False
+        assert db.is_decode_safe is False
+        assert db.message_decode_safety == {100: True}
 
     def test_mutation_helpers_not_exported(self):
         for name in (

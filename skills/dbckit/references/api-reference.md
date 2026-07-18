@@ -127,6 +127,20 @@ Fields:
 - `location: str`
 - `message: str`
 
+### `ParseDiagnostic`
+
+Source metadata recorded when lenient parsing skips an unsupported construct or
+dangling reference.
+
+Fields:
+
+- `construct: str`
+- `line: int` — one-based normalized source line
+- `message_id: int | None = None`
+- `signal_name: str | None = None`
+- `effect: Literal["decode_degraded", "cosmetic"]`
+- `detail: str`
+
 ### `ValueTable`
 
 Fields:
@@ -221,6 +235,23 @@ Fields:
 - `ns_values: list[str] = []`
 - `bit_timing: str | None = None`
 - `dbc_specific: dict[str, Any] = {}`
+- `parse_diagnostics: list[ParseDiagnostic] = []`
+
+`parse_diagnostics` is source metadata. It is not emitted by `dump()` and does
+not participate in semantic database diffing.
+
+### Lenient parsing and decode safety
+
+`Database.decode_safe` is a derived global rollup. It is false when any parse
+diagnostic has `effect == "decode_degraded"`; cosmetic diagnostics do not make
+it false. `Database.is_decode_safe` is an alias.
+
+`Database.message_decode_safety` derives a mapping for every surviving message.
+`Database.message_decode_safe(arbitration_id)` returns one entry and raises
+`KeyError` for an unknown ID; `is_message_decode_safe()` is an alias. A scoped
+degrading diagnostic marks only its affected message unsafe. An unscoped
+degrading diagnostic makes the global rollup unsafe without guessing which
+individual message was affected.
 
 ## Database Methods
 
@@ -560,7 +591,7 @@ Removes a node-level attribute value.
 
 ## Parse and I/O
 
-### `parse(text: str) -> Database`
+### `parse(text: str, *, on_unsupported: Literal["raise", "skip"] = "raise") -> Database`
 
 Top-level convenience wrapper for `normalize()` followed by `parse_string()`.
 
@@ -571,16 +602,22 @@ Behavior:
 - replaces tabs with spaces
 - ensures trailing newline
 - parses the normalized text into a `Database`
+- preserves strict 1.0 behavior when `on_unsupported="raise"`
+- with `on_unsupported="skip"`, isolates only safely bounded unsupported
+  constructs and records ordered `ParseDiagnostic` entries
 
 Raises:
 
 - parser exceptions from Lark on invalid DBC syntax
+- `ValueError` for an invalid `on_unsupported` policy
+- parser exceptions for unknown or unsafe-to-isolate syntax even in skip mode
 
-### `parse_string(text: str) -> Database`
+### `parse_string(text: str, *, on_unsupported: Literal["raise", "skip"] = "raise") -> Database`
 
 Public from `dbckit.parser`.
 
-Parses a DBC string exactly as provided. Use this if you want parser access without the normalization pass.
+Parses a DBC string exactly as provided. Use this if you want parser access without
+the normalization pass. It accepts the same unsupported-construct policy as `parse()`.
 
 Raises:
 
@@ -597,7 +634,7 @@ Normalizes raw DBC text before parsing:
 - replaces tabs with spaces
 - appends a trailing newline when missing
 
-### `load(path: str | Path, *, encoding: str | None = None) -> Database`
+### `load(path: str | Path, *, encoding: str | None = None, on_unsupported: Literal["raise", "skip"] = "raise") -> Database`
 
 Reads a DBC file and returns a parsed `Database`.
 
@@ -606,6 +643,7 @@ Behavior:
 - when `encoding` is omitted, decodes strictly as UTF-8 and falls back to cp1252
 - when `encoding` is provided, uses it strictly without fallback or replacement
 - parses normalized content
+- forwards `on_unsupported` to the parser
 - returns a copy with `db.filename` set to the string form of `path`
 
 Raises:
