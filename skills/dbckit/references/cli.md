@@ -306,7 +306,7 @@ dbckit decode frame --db vehicle.dbc 0x1F4 "E8 03 00 00 00 00 00 00"
 Decode a single signal from frame bytes and print its physical value with the
 unit.
 
-### `decode log --db FILE LOG_PATH [--limit N] [--format EXT] [-o table|json]`
+### `decode log --db FILE LOG_PATH [--limit N] [--format EXT] [--match exact|j1939|auto] [-o table|json]`
 
 Decode frames from a CAN log file. The reader is selected by file extension
 (`.asc` is built in; more can be registered via `dbckit.register_reader()` or
@@ -315,9 +315,15 @@ the `dbckit.readers` entry-point group).
 - `--limit N` stops after N frames (0 = all).
 - `--format EXT` overrides extension-based reader selection for oddly named
   files, with or without a leading dot (e.g. `--format asc`).
+- `--match exact|j1939|auto` selects message resolution. `exact` is the default;
+  `j1939` matches extended frames by derived PGN; `auto` prefers exact IDs and
+  permits PGN fallback only when `PGN` or `ProtocolType` attributes identify a
+  J1939 database.
+- Ambiguous J1939 matches print their ordered candidate message IDs in table
+  output and serialize as structured `AmbiguousFrameMatch` objects in JSON.
 
 ```bash
-dbckit decode log --db vehicle.dbc trace.asc --limit 100
+dbckit decode log --db vehicle.dbc trace.asc --limit 100 --match auto
 dbckit decode log --db vehicle.dbc capture.txt --format asc
 ```
 

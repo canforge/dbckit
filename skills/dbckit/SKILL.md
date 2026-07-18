@@ -109,9 +109,10 @@ result = dbckit.diff(db_a, db_b)            # result.is_empty, added/removed/mod
 merged = dbckit.merge(db_a, db_b, strategy="ours")   # raise | ours | theirs
 sub = dbckit.extract(db, [0x100], message_names=["EngineData"], node_names=["Gateway"])
 
-# J1939 — reads explicit PGN/SPN ATTRIBUTES only (no 29-bit ID math)
+# J1939 attribute lookup
 views = dbckit.find_messages_by_pgn(db, 61444)
 owner_view, sig_view = db.signal_by_spn(190)
+pgn = dbckit.pgn_from_arbitration_id(0x18F00401)
 
 # codegen
 text = dbckit.codegen(db, "python")         # "c" | "python" | "markdown" | "json-schema"
@@ -131,6 +132,8 @@ dbckit.decode_log(db, "capture.txt", format="asc")      # extension override
 
 # any object with .timestamp, .arbitration_id, .data decodes — python-can included
 decoded = dbckit.decode_frames(db, frames_iterable)     # iterator, no file I/O
+decoded = dbckit.decode_frames(db, frames_iterable, match="j1939")
+decoded = dbckit.decode_frames(db, frames_iterable, match="auto")
 ```
 
 Other log formats: `dbckit.register_reader(".blf", reader)` or a package
@@ -163,8 +166,9 @@ Attribute targets: `node:ECU1`, `message:0x1F4`, `signal:0x1F4:Speed`, `""` = da
   parse time with a clear error. There is no workaround flag; simple `M`/`mX`
   multiplexing is fully supported.
 - **CAN FD** is untested/unsupported; `.sym`, `.kcd`, ARXML are out of scope.
-- **J1939** helpers need explicit `PGN`/`SPN` attribute values in the DBC; they
-  never derive PGNs from 29-bit arbitration IDs.
+- **J1939** lookup helpers need explicit `PGN`/`SPN` attribute values. Frame
+  decoding can match by a PGN derived from 29-bit IDs with `match="j1939"`;
+  `match="auto"` requires a valid `PGN` or J1939 `ProtocolType` marker.
 - Encoding zero-fills unspecified signals and ignores `GenSigStartValue`.
 - Missing entities raise `KeyError`; duplicates, rename collisions, and mux
   contradictions raise `ValueError`. Parsing rejects dangling `CM_`/`BA_`/`VAL_`

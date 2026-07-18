@@ -5,7 +5,7 @@ import csv
 import json
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 try:
     import typer
@@ -60,6 +60,16 @@ def _load(path: Path) -> dbckit.Database:
 
 def _out_format(fmt: str) -> str:
     return fmt.lower()
+
+
+def _frame_match_mode(value: str) -> dbckit.FrameMatchMode:
+    normalized = value.strip().lower()
+    if normalized not in ("exact", "j1939", "auto"):
+        raise typer.BadParameter(
+            "must be one of: exact, j1939, auto",
+            param_hint="--match",
+        )
+    return cast(dbckit.FrameMatchMode, normalized)
 
 
 def _print_json(obj) -> None:
@@ -978,17 +988,41 @@ def decode_log_cmd(
         "--format",
         help="Reader format override, with or without a leading dot.",
     ),
+    match: str = typer.Option(
+        "exact",
+        "--match",
+        help="Message resolution mode: exact, j1939, or auto.",
+    ),
 ):
     """[yellow]Decode frames from a CAN log file.[/yellow]"""
+    match_mode = _frame_match_mode(match)
     db = _load(db_path)
     count = 0
-    for frame in dbckit.decode_log(db, log_path, format=format_):
+    for frame in dbckit.decode_log(
+        db,
+        log_path,
+        format=format_,
+        match=match_mode,
+    ):
         if _out_format(output) == "json":
             _print_json(frame)
-        else:
+        elif isinstance(frame, dbckit.AmbiguousFrameMatch):
+            candidates = ", ".join(
+                f"{candidate:#x}" for candidate in frame.candidate_message_ids
+            )
             console.print(
                 f"[cyan]{frame.timestamp:.6f}[/cyan] "
                 f"[bold]{frame.arbitration_id:#x}[/bold]: "
+                f"[yellow]ambiguous J1939 match[/yellow] "
+                f"(candidates: {candidates})"
+            )
+        else:
+            message_ref = f"[bold]{frame.arbitration_id:#x}[/bold]"
+            if frame.message_arbitration_id != frame.arbitration_id:
+                message_ref += f" → [bold]{frame.message_arbitration_id:#x}[/bold]"
+            console.print(
+                f"[cyan]{frame.timestamp:.6f}[/cyan] "
+                f"{message_ref}: "
                 + ", ".join(f"{k}={v}" for k, v in frame.signals.items())
             )
         count += 1

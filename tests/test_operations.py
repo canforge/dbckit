@@ -500,6 +500,34 @@ class TestSearch:
 
 
 class TestJ1939Lookup:
+    @pytest.mark.parametrize(
+        ("arbitration_id", "expected_pgn"),
+        [
+            (0x18EF2201, 0xEF00),  # PDU1 destination is omitted
+            (0x18F00401, 0xF004),  # PDU2 group extension is retained
+            (0x18F00501, 0xF005),
+            (0x03EFAA55, 0x3EF00),  # EDP and DP bits are retained
+            (0x03FFFF55, 0x3FFFF),
+            (0, 0),
+            (0x1FFFFFFF, 0x3FFFF),
+        ],
+    )
+    def test_pgn_from_arbitration_id(self, arbitration_id, expected_pgn):
+        assert dbckit.pgn_from_arbitration_id(arbitration_id) == expected_pgn
+
+    def test_pgn_omits_priority_and_source_address(self):
+        assert dbckit.pgn_from_arbitration_id(0x18F00401) == dbckit.pgn_from_arbitration_id(0x0CF004FE)
+
+    @pytest.mark.parametrize("arbitration_id", [-1, 0x20000000])
+    def test_pgn_rejects_ids_outside_29_bits(self, arbitration_id):
+        with pytest.raises(ValueError, match="between 0x0 and 0x1fffffff"):
+            dbckit.pgn_from_arbitration_id(arbitration_id)
+
+    @pytest.mark.parametrize("arbitration_id", [True, 1.5, "0x18F00401"])
+    def test_pgn_rejects_non_integer_ids(self, arbitration_id):
+        with pytest.raises(TypeError, match="must be an integer"):
+            dbckit.pgn_from_arbitration_id(arbitration_id)
+
     def test_find_messages_by_pgn(self, j1939_db):
         matches = dbckit.find_messages_by_pgn(j1939_db, 61444)
         assert [view.name for view in matches] == ["EngineData", "DuplicatePgn"]

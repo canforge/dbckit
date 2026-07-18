@@ -141,12 +141,14 @@ messages = dbckit.search_messages(db, "engine")
 pairs = dbckit.search_signals(db, "speed")
 ```
 
-J1939 helpers look up messages and signals by explicit `PGN`/`SPN` attribute
-values:
+J1939 lookup helpers continue to use explicit `PGN`/`SPN` attribute values.
+For frame resolution, `pgn_from_arbitration_id()` derives the PGN directly from
+a 29-bit ID with PDU1/PDU2 handling:
 
 ```python
 matches = dbckit.find_messages_by_pgn(db, 61444)
 owner, sig = db.signal_by_spn(177)
+pgn = dbckit.pgn_from_arbitration_id(0x18F00401)  # 61444
 ```
 
 ### Log and frame decoding
@@ -170,6 +172,12 @@ your own tooling decode directly:
 
 ```python
 decoded = dbckit.decode_frames(db, my_frames)   # Iterator[DecodedFrame]
+
+# Resolve J1939 frames by derived PGN; ambiguous matches are returned explicitly.
+decoded = dbckit.decode_frames(db, my_frames, match="j1939")
+
+# Prefer exact IDs, then allow PGN fallback only for a J1939-marked DBC.
+decoded = dbckit.decode_frames(db, my_frames, match="auto")
 ```
 
 ### Code generation
@@ -194,7 +202,7 @@ dbckit db diff base.dbc changed.dbc
 dbckit message list --db vehicle.dbc
 dbckit signal layout --db vehicle.dbc 0x1F4
 dbckit decode frame --db vehicle.dbc 0x1F4 "E8 03 00 00 00 00 00 00"
-dbckit decode log --db vehicle.dbc trace.asc
+dbckit decode log --db vehicle.dbc trace.asc --match auto
 dbckit codegen markdown --db vehicle.dbc --out docs.md
 ```
 
@@ -205,8 +213,9 @@ See the [CLI reference](docs/cli.md) for every command and option.
 - Classic CAN DBC workflows are the supported surface; CAN FD is untested and
   FD-specific flags such as `VFrameFormat` are not interpreted.
 - `.sym`, `.kcd`, and ARXML database formats are out of scope.
-- J1939 helpers use explicit `PGN`/`SPN` attribute values only; they do not
-  derive PGNs from 29-bit arbitration IDs.
+- J1939 lookup helpers use explicit `PGN`/`SPN` attribute values. Frame-stream
+  matching can derive PGNs from 29-bit IDs with `match="j1939"`; `match="auto"`
+  requires a valid message `PGN` or J1939 `ProtocolType` attribute marker.
 - Frame encoding zero-fills unspecified signals and ignores `GenSigStartValue`.
 - Mutation helpers are pure at the `Database` level, but the underlying
   Pydantic models are not frozen objects.

@@ -61,7 +61,7 @@ live in exactly the `BA_` lines that currently fail to parse on extended-ID file
   `effect: decode_degraded | cosmetic`); decode-safety is tracked per message with a
   derived global rollup, and lenient mode never silently alters decode semantics.
   Subsumes the previously deferred `errors="collect"` lenient load mode item.
-- [ ] J1939 PGN-aware message resolution: `decode_frames(..., match="exact" | "j1939" |
+- [x] J1939 PGN-aware message resolution: `decode_frames(..., match="exact" | "j1939" |
   "auto")`. PGN is derived from the 29-bit arbitration ID (PDU1/PDU2 handling, source
   address ignored); the `BA_` `PGN`/`ProtocolType` attributes serve only as the
   auto-detection signal; ambiguous PGN matches are returned explicitly. Pure ID math

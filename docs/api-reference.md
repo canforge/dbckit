@@ -49,9 +49,12 @@ from dbckit.operations import (
     codegen,
     decode_frames,
     decode_log,
+    AmbiguousFrameMatch,
+    FrameMatchMode,
     FrameLike,
     find_messages_by_pgn,
     find_signals_by_spn,
+    pgn_from_arbitration_id,
 )
 ```
 
@@ -942,6 +945,21 @@ Behavior:
 - ignores missing, empty, invalid, and non-integral values
 - returns `[]` when there are no matches
 
+### `pgn_from_arbitration_id(arbitration_id: int) -> int`
+
+Derives the 18-bit J1939 parameter group number from a clean 29-bit CAN
+arbitration ID without reading DBC attributes.
+
+Behavior:
+
+- retains the extended data-page, data-page, and PDU-format bits
+- clears the PDU-specific byte for PDU1 (`PF < 240`), where it is a destination
+  address
+- retains the PDU-specific byte for PDU2, where it is the group extension
+- omits the priority and source-address bits
+- raises `TypeError` for non-integer values and `ValueError` outside
+  `0x00000000..0x1FFFFFFF`
+
 ### `CodegenTarget`
 
 Literal values:
@@ -999,10 +1017,33 @@ Fields:
 
 - `timestamp: float`
 - `arbitration_id: int`
+- `message_arbitration_id: int` — resolved DBC message ID; may differ from the
+  incoming ID under J1939 PGN matching
 - `raw: bytes`
 - `signals: dict[str, float | int | str]`
 - `channel: int | None = None`
 - `is_extended_frame: bool = False`
+
+### `AmbiguousFrameMatch`
+
+Returned instead of decoding when J1939 PGN resolution finds multiple DBC
+messages. Candidate order follows database message insertion order.
+
+Fields:
+
+- `timestamp: float`
+- `arbitration_id: int`
+- `raw: bytes`
+- `candidate_message_ids: list[int]`
+- `channel: int | None = None`
+- `is_extended_frame: bool = False`
+
+The result deliberately contains no decoded signals because selecting a
+candidate implicitly would be unsafe.
+
+### `FrameMatchMode`
+
+Literal values: `"exact"`, `"j1939"`, and `"auto"`.
 
 ### `AscReader`
 
@@ -1019,17 +1060,28 @@ Behavior:
 - preserves the numeric channel and extended-frame marker
 - returns raw payload bytes from the frame data columns
 
-### `decode_frames(db: Database, frames: Iterable[FrameLike]) -> Iterator[DecodedFrame]`
+### `decode_frames(db: Database, frames: Iterable[FrameLike], *, match: FrameMatchMode = "exact") -> Iterator[DecodedFrame | AmbiguousFrameMatch]`
 
 Pure frame-stream decoding with no file I/O.
 
 Behavior:
 
 - accepts any iterable whose items satisfy the three-field `FrameLike` contract
-- skips frames whose arbitration IDs are absent from `db.messages`
+- `"exact"` preserves the original behavior: it looks up the incoming ID
+  directly and skips absent IDs
+- `"j1939"` derives PGNs from eligible extended input frames and extended DBC
+  messages, ignoring priority, source address, and PDU1 destination address
+- `"auto"` prefers an exact ID, then enables derived-PGN fallback only when a
+  message has a valid `PGN` attribute or a database/message `ProtocolType`
+  attribute identifies J1939
+- `PGN` and `ProtocolType` are detection signals only; candidate matching always
+  uses ID-derived PGNs
+- returns `AmbiguousFrameMatch` when multiple messages share the derived PGN
+  and skips frames with no candidate
 - delegates each known frame to `decode_frame()`, including mux filtering and
   value-table resolution
-- copies `channel` and `is_extended_frame` with safe defaults when absent
+- preserves the incoming ID in `arbitration_id`, records the resolved DBC ID in
+  `message_arbitration_id`, and copies optional metadata with safe defaults
 
 ### `register_reader(extension: str, reader: LogReader) -> None`
 
@@ -1045,7 +1097,7 @@ Behavior:
   the same normalized extension
 - explicit registration takes precedence over discovered entry points and built-ins
 
-### `decode_log(db: Database, path: str | Path, *, format: str | None = None) -> Iterator[DecodedFrame]`
+### `decode_log(db: Database, path: str | Path, *, format: str | None = None, match: FrameMatchMode = "exact") -> Iterator[DecodedFrame | AmbiguousFrameMatch]`
 
 Decodes frames from a log file using the registered reader for the file extension.
 
@@ -1055,9 +1107,9 @@ Behavior:
 - normalizes formats case-insensitively with or without a leading dot
 - resolves readers in this order: explicit registration, entry point, built-in
 - raises `ValueError` for an unknown format and lists available extensions
-- delegates the reader's iterable to `decode_frames()`
+- delegates the reader's iterable and `match` mode to `decode_frames()`
 
-The CLI exposes the same override as `dbckit decode log --format trc`.
+The CLI exposes both options as `dbckit decode log --format trc --match auto`.
 
 ### Writing a reader package
 

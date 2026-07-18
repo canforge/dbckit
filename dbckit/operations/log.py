@@ -5,12 +5,15 @@ import re
 from collections.abc import Iterable, Iterator
 from importlib import metadata
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol, TypedDict, cast, overload
 
 from pydantic import BaseModel
 
 from dbckit.codec.frame import decode_frame
-from dbckit.model.database import Database
+from dbckit.model.database import AttributeDefinition, AttributeKind, Database
+from dbckit.operations.j1939 import _normalize_attr_int, pgn_from_arbitration_id
+
+FrameMatchMode = Literal["exact", "j1939", "auto"]
 
 
 class FrameLike(Protocol):
@@ -36,12 +39,29 @@ class DecodedFrame(BaseModel):
 
     timestamp: float
     arbitration_id: int
+    message_arbitration_id: int
     raw: bytes
     signals: dict[str, float | int | str]
     channel: int | None = None
     is_extended_frame: bool = False
 
     model_config = {"arbitrary_types_allowed": True}
+
+
+class AmbiguousFrameMatch(BaseModel):
+    """A raw frame whose derived J1939 PGN has multiple DBC candidates."""
+
+    timestamp: float
+    arbitration_id: int
+    raw: bytes
+    candidate_message_ids: list[int]
+    channel: int | None = None
+    is_extended_frame: bool = False
+
+    model_config = {"arbitrary_types_allowed": True}
+
+
+FrameDecodeResult = DecodedFrame | AmbiguousFrameMatch
 
 
 class LogReader(Protocol):
@@ -184,22 +204,176 @@ def _reader_for(extension: str) -> LogReader:
     )
 
 
+def _is_j1939_frame(frame: FrameLike) -> bool:
+    return bool(
+        getattr(frame, "is_extended_frame", False)
+        or frame.arbitration_id > 0x7FF
+    )
+
+
+def _j1939_pgn_index(db: Database) -> dict[int, list[int]]:
+    index: dict[int, list[int]] = {}
+    for arbitration_id, message in db.messages.items():
+        if not message.is_extended_frame:
+            continue
+        try:
+            pgn = pgn_from_arbitration_id(arbitration_id)
+        except (TypeError, ValueError):
+            continue
+        index.setdefault(pgn, []).append(arbitration_id)
+    return index
+
+
+def _enum_label(
+    value: object,
+    definition: AttributeDefinition | None,
+) -> str | None:
+    if definition is None or definition.kind != AttributeKind.ENUM:
+        return None
+    index = _normalize_attr_int(value)
+    if index is None or not 0 <= index < len(definition.values):
+        return None
+    return definition.values[index]
+
+
+def _identifies_j1939(
+    value: object,
+    definition: AttributeDefinition | None,
+) -> bool:
+    candidates = [value, _enum_label(value, definition)]
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        normalized = "".join(
+            character
+            for character in str(candidate).casefold()
+            if character.isalnum()
+        )
+        if normalized.startswith(("j1939", "saej1939")):
+            return True
+    return False
+
+
+def _has_j1939_marker(db: Database) -> bool:
+    if any(
+        (pgn := _normalize_attr_int(message.attributes.get("PGN"))) is not None
+        and 0 <= pgn <= 0x3FFFF
+        for message in db.messages.values()
+    ):
+        return True
+
+    definition = db.attributes.get("ProtocolType")
+    protocol_values = [db.attribute_values.get("ProtocolType")]
+    protocol_values.extend(
+        message.attributes.get("ProtocolType") for message in db.messages.values()
+    )
+    return any(
+        _identifies_j1939(value, definition)
+        for value in protocol_values
+        if value is not None
+    )
+
+
+class _FrameMetadata(TypedDict):
+    channel: int | None
+    is_extended_frame: bool
+
+
+def _frame_metadata(frame: FrameLike) -> _FrameMetadata:
+    return {
+        "channel": getattr(frame, "channel", None),
+        "is_extended_frame": getattr(frame, "is_extended_frame", False),
+    }
+
+
+@overload
 def decode_frames(
     db: Database,
     frames: Iterable[FrameLike],
-) -> Iterator[DecodedFrame]:
-    """Decode an iterable of structurally compatible CAN frames."""
-    for frame in frames:
-        if frame.arbitration_id not in db.messages:
-            continue
-        yield DecodedFrame(
-            timestamp=frame.timestamp,
-            arbitration_id=frame.arbitration_id,
-            raw=frame.data,
-            signals=decode_frame(db, frame.arbitration_id, frame.data),
-            channel=getattr(frame, "channel", None),
-            is_extended_frame=getattr(frame, "is_extended_frame", False),
-        )
+    *,
+    match: Literal["exact"] = "exact",
+) -> Iterator[DecodedFrame]: ...
+
+
+@overload
+def decode_frames(
+    db: Database,
+    frames: Iterable[FrameLike],
+    *,
+    match: Literal["j1939", "auto"],
+) -> Iterator[FrameDecodeResult]: ...
+
+
+def decode_frames(
+    db: Database,
+    frames: Iterable[FrameLike],
+    *,
+    match: FrameMatchMode = "exact",
+) -> Iterator[FrameDecodeResult]:
+    """Decode structurally compatible CAN frames using the selected ID match mode."""
+    if match not in ("exact", "j1939", "auto"):
+        raise ValueError("match must be 'exact', 'j1939', or 'auto'.")
+
+    pgn_index = _j1939_pgn_index(db) if match != "exact" else {}
+    auto_fallback = match == "auto" and _has_j1939_marker(db)
+
+    def decoded() -> Iterator[FrameDecodeResult]:
+        for frame in frames:
+            message_id: int | None = None
+            if match in ("exact", "auto") and frame.arbitration_id in db.messages:
+                message_id = frame.arbitration_id
+            elif match == "j1939" or auto_fallback:
+                if not _is_j1939_frame(frame):
+                    continue
+                try:
+                    pgn = pgn_from_arbitration_id(frame.arbitration_id)
+                except (TypeError, ValueError):
+                    continue
+                candidates = pgn_index.get(pgn, [])
+                if len(candidates) > 1:
+                    yield AmbiguousFrameMatch(
+                        timestamp=frame.timestamp,
+                        arbitration_id=frame.arbitration_id,
+                        raw=frame.data,
+                        candidate_message_ids=candidates,
+                        **_frame_metadata(frame),
+                    )
+                    continue
+                if candidates:
+                    message_id = candidates[0]
+
+            if message_id is None:
+                continue
+            yield DecodedFrame(
+                timestamp=frame.timestamp,
+                arbitration_id=frame.arbitration_id,
+                message_arbitration_id=message_id,
+                raw=frame.data,
+                signals=decode_frame(db, message_id, frame.data),
+                **_frame_metadata(frame),
+            )
+
+    return decoded()
+
+
+@overload
+def decode_log(
+    db: Database,
+    path: str | Path,
+    *,
+    format: str | None = None,
+    match: Literal["exact"] = "exact",
+) -> Iterator[DecodedFrame]: ...
+
+
+@overload
+def decode_log(
+    db: Database,
+    path: str | Path,
+    *,
+    format: str | None = None,
+    match: Literal["j1939", "auto"],
+) -> Iterator[FrameDecodeResult]: ...
 
 
 def decode_log(
@@ -207,7 +381,8 @@ def decode_log(
     path: str | Path,
     *,
     format: str | None = None,
-) -> Iterator[DecodedFrame]:
+    match: FrameMatchMode = "exact",
+) -> Iterator[FrameDecodeResult]:
     """Decode frames from *path* using an explicit or extension-based format."""
     p = Path(path)
     if format is not None:
@@ -217,13 +392,19 @@ def decode_log(
     else:
         extension = ""
     reader = _reader_for(extension)
-    return decode_frames(db, reader.read(p))
+    return cast(
+        Iterator[FrameDecodeResult],
+        decode_frames(db, reader.read(p), match=match),
+    )
 
 
 __all__ = [
     "AscReader",
+    "AmbiguousFrameMatch",
     "DecodedFrame",
+    "FrameDecodeResult",
     "FrameLike",
+    "FrameMatchMode",
     "LogReader",
     "RawFrame",
     "decode_frames",

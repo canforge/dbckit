@@ -111,8 +111,12 @@ value raises `ValueError`.
 - Classic CAN is the supported frame scope. CAN FD remains untested, and FD-specific
   attributes such as `VFrameFormat` are not interpreted.
 - `.sym`, `.kcd`, and ARXML database formats are out of scope.
-- J1939 lookup uses explicit `PGN` and `SPN` attributes only; PGNs are not derived
-  from 29-bit arbitration IDs.
+- J1939 lookup helpers use explicit `PGN` and `SPN` attributes. Frame-stream
+  decoding can match extended messages by a PGN derived from the 29-bit
+  arbitration ID, with correct PDU1/PDU2 handling and source-address omission.
+  Auto matching uses valid message `PGN` and database/message `ProtocolType`
+  attributes only as detection signals; it does not treat their values as match
+  keys, and `VFrameFormat` does not activate auto matching.
 - Encoding allocates a zero-filled payload and writes only supplied signals.
   `GenSigStartValue` is ignored.
 

@@ -1,11 +1,34 @@
-"""Minimal J1939 lookup helpers based on DBC attribute values."""
+"""J1939 identifier math and attribute-based lookup helpers."""
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from dbckit._frame_id import CAN_EXTENDED_FRAME_ID_MASK
+
 if TYPE_CHECKING:
     from dbckit.model.database import Database
     from dbckit.views import MessageView, SignalView
+
+
+def pgn_from_arbitration_id(arbitration_id: int) -> int:
+    """Return the 18-bit J1939 PGN encoded in a 29-bit arbitration ID.
+
+    Priority and source-address bits are omitted. For PDU1 identifiers
+    (``PF < 240``), the destination-address byte is also cleared. For PDU2
+    identifiers, that byte is the group extension and remains part of the PGN.
+    """
+    if isinstance(arbitration_id, bool) or not isinstance(arbitration_id, int):
+        raise TypeError("J1939 arbitration ID must be an integer.")
+    if not 0 <= arbitration_id <= CAN_EXTENDED_FRAME_ID_MASK:
+        raise ValueError(
+            "J1939 arbitration ID must be between 0x0 and 0x1fffffff."
+        )
+
+    pgn = (arbitration_id >> 8) & 0x3FFFF
+    pdu_format = (arbitration_id >> 16) & 0xFF
+    if pdu_format < 0xF0:
+        pgn &= 0x3FF00
+    return pgn
 
 
 def find_messages_by_pgn(db: Database, pgn: int) -> list[MessageView]:

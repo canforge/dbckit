@@ -11,6 +11,12 @@ Versioning follows [Semantic Versioning](https://semver.org/) from 1.0.0 onward.
 
 ### Added
 
+- Add PGN-aware J1939 frame resolution with `match="j1939"` and attribute-gated
+  `match="auto"` modes on `decode_frames()` and `decode_log()`, plus the matching
+  CLI option. PGNs are derived from 29-bit IDs with PDU1/PDU2 handling;
+  ambiguous candidates are returned explicitly as `AmbiguousFrameMatch`.
+- Add the dependency-free `pgn_from_arbitration_id()` helper and expose the
+  resolved DBC ID as `DecodedFrame.message_arbitration_id`.
 - Add opt-in lenient parsing with `on_unsupported="skip"` on `parse()`,
   `parse_string()`, and `load()`. Safely bounded extended-multiplexing syntax and
   dangling references produce ordered, structured parse diagnostics with

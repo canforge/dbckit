@@ -10,6 +10,9 @@ from typer.testing import CliRunner
 
 import dbckit
 from dbckit.cli import app
+from dbckit.model.database import Database
+from dbckit.model.message import Message
+from dbckit.model.signal import Signal
 
 FIXTURES = Path(__file__).parent / "fixtures"
 SIMPLE = FIXTURES / "simple.dbc"
@@ -404,6 +407,137 @@ class TestDecodeLogCmd:
 
         assert result.exit_code == 0, result.output
         assert "EngineSpeed=100.0" in result.output
+
+    @staticmethod
+    def _ambiguous_db() -> Database:
+        messages = {}
+        for arbitration_id, name in (
+            (0x18F00402, "First"),
+            (0x18F00401, "Second"),
+        ):
+            messages[arbitration_id] = Message(
+                arbitration_id=arbitration_id,
+                name=name,
+                length=8,
+                is_extended_frame=True,
+                signals={"Value": Signal(name="Value", start_bit=0, length=8)},
+            )
+        return Database(messages=messages)
+
+    @staticmethod
+    def _register_ambiguous_reader():
+        class AmbiguousReader:
+            def read(self, path: Path):
+                yield dbckit.RawFrame(
+                    timestamp=2.5,
+                    arbitration_id=0x0CF004AB,
+                    data=b"\x2a" + b"\x00" * 7,
+                    channel=4,
+                    is_extended_frame=True,
+                )
+
+        dbckit.register_reader("cli-j1939", AmbiguousReader())
+
+    def test_j1939_ambiguity_table_output(self, tmp_path, monkeypatch):
+        self._register_ambiguous_reader()
+        monkeypatch.setattr("dbckit.cli._load", lambda path: self._ambiguous_db())
+
+        result = runner.invoke(
+            app,
+            [
+                "decode",
+                "log",
+                "--db",
+                str(SIMPLE),
+                str(tmp_path / "trace.bin"),
+                "--format",
+                "cli-j1939",
+                "--match",
+                "j1939",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "ambiguous J1939 match" in result.output
+        assert "0x18f00402, 0x18f00401" in result.output
+
+    def test_j1939_ambiguity_json_output(self, tmp_path, monkeypatch):
+        self._register_ambiguous_reader()
+        monkeypatch.setattr("dbckit.cli._load", lambda path: self._ambiguous_db())
+
+        result = runner.invoke(
+            app,
+            [
+                "decode",
+                "log",
+                "--db",
+                str(SIMPLE),
+                str(tmp_path / "trace.bin"),
+                "--format",
+                "cli-j1939",
+                "--match",
+                "j1939",
+                "--output",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["candidate_message_ids"] == [0x18F00402, 0x18F00401]
+        assert payload["arbitration_id"] == 0x0CF004AB
+
+    def test_j1939_decoded_json_includes_resolved_message_id(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        self._register_ambiguous_reader()
+        full_db = self._ambiguous_db()
+        db = full_db.model_copy(
+            update={"messages": {0x18F00401: full_db.messages[0x18F00401]}},
+        )
+        monkeypatch.setattr("dbckit.cli._load", lambda path: db)
+
+        result = runner.invoke(
+            app,
+            [
+                "decode",
+                "log",
+                "--db",
+                str(SIMPLE),
+                str(tmp_path / "trace.bin"),
+                "--format",
+                "cli-j1939",
+                "--match",
+                "j1939",
+                "--output",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["arbitration_id"] == 0x0CF004AB
+        assert payload["message_arbitration_id"] == 0x18F00401
+        assert payload["signals"] == {"Value": 42.0}
+
+    def test_rejects_unknown_match_mode(self, tmp_path):
+        result = runner.invoke(
+            app,
+            [
+                "decode",
+                "log",
+                "--db",
+                str(SIMPLE),
+                str(tmp_path / "trace.asc"),
+                "--match",
+                "guess",
+            ],
+        )
+
+        assert result.exit_code == 2
+        assert "must be one of: exact, j1939, auto" in result.output
 
 
 # ── encode frame ──────────────────────────────────────────────────────────────

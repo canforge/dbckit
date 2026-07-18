@@ -21,11 +21,13 @@ from dbckit.model.signal import BitSlot, ByteOrder, Signal, SignalGroup, ValueTa
 
 # ── operations ────────────────────────────────────────────────────────────────
 from dbckit.operations import (
+    AmbiguousFrameMatch,
     AscReader,
     CodegenTarget,
     DecodedFrame,
     DiffResult,
     FrameLike,
+    FrameMatchMode,
     MergeStrategy,
     MessageDiff,
     RawFrame,
@@ -38,6 +40,7 @@ from dbckit.operations import (
     find_messages_by_pgn,
     find_signals_by_spn,
     merge,
+    pgn_from_arbitration_id,
     register_reader,
     search_messages,
     search_signals,
@@ -69,9 +72,10 @@ __all__ = [
     "merge", "MergeStrategy",
     "extract",
     "search_messages", "search_signals",
-    "find_messages_by_pgn", "find_signals_by_spn",
+    "find_messages_by_pgn", "find_signals_by_spn", "pgn_from_arbitration_id",
     "codegen", "CodegenTarget",
-    "decode_frames", "decode_log", "DecodedFrame", "FrameLike", "RawFrame",
+    "decode_frames", "decode_log", "DecodedFrame", "AmbiguousFrameMatch",
+    "FrameMatchMode", "FrameLike", "RawFrame",
     "AscReader", "register_reader",
 ]
 

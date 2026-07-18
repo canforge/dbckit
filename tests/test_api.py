@@ -99,9 +99,12 @@ class TestModuleExports:
             "search_signals",
             "find_messages_by_pgn",
             "find_signals_by_spn",
+            "pgn_from_arbitration_id",
             "decode_frames",
             "decode_log",
             "FrameLike",
+            "FrameMatchMode",
+            "AmbiguousFrameMatch",
             "codegen",
             "ParseDiagnostic",
         ):
