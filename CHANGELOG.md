@@ -9,6 +9,8 @@ Versioning follows [Semantic Versioning](https://semver.org/) from 1.0.0 onward.
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-07-18
+
 ### Fixed
 
 - Normalize DBC bit-31 extended-frame IDs across every parser-side message
