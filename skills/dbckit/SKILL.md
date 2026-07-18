@@ -120,7 +120,8 @@ text = dbckit.codegen(db, "python")         # "c" | "python" | "markdown" | "jso
 
 Signal fields: `start_bit`, `length`, `byte_order` (`ByteOrder.little_endian` /
 `big_endian`), `is_signed`, `factor`, `offset`, `minimum`, `maximum`, `unit`,
-`receivers`, `multiplex_indicator` (`"M"` or `"m0"`, `"m1"`, …).
+`receivers`, `multiplex_indicator` (`"M"` or `"m0"`, `"m1"`, …), and
+`signal_type` (`1` = IEEE-754 float, `2` = double).
 
 ## Logs and frames
 
@@ -162,18 +163,23 @@ Attribute targets: `node:ECU1`, `message:0x1F4`, `signal:0x1F4:Speed`, `""` = da
 
 ## Hard limits — don't fight these
 
-- **Extended multiplexing** (`m0M` indicators, `SG_MUL_VAL_`) is rejected at
-  parse time with a clear error. There is no workaround flag; simple `M`/`mX`
-  multiplexing is fully supported.
+- **Extended multiplexing** (`m0M` indicators, `SG_MUL_VAL_`) is rejected by
+  default with a clear error. `on_unsupported="skip"` can isolate only safely
+  bounded forms by omitting them and recording `decode_degraded` diagnostics; it
+  does not add extended-multiplexing support. Simple `M`/`mX` multiplexing is
+  fully supported.
 - **CAN FD** is untested/unsupported; `.sym`, `.kcd`, ARXML are out of scope.
 - **J1939** lookup helpers need explicit `PGN`/`SPN` attribute values. Frame
   decoding can match by a PGN derived from 29-bit IDs with `match="j1939"`;
   `match="auto"` requires a valid `PGN` or J1939 `ProtocolType` marker.
 - Encoding zero-fills unspecified signals and ignores `GenSigStartValue`.
 - Missing entities raise `KeyError`; duplicates, rename collisions, and mux
-  contradictions raise `ValueError`. Parsing rejects dangling `CM_`/`BA_`/`VAL_`
-  references instead of dropping them — a file that won't load is malformed,
-  not a dbckit bug.
+  contradictions raise `ValueError`. Strict parsing rejects dangling
+  `CM_`/`BA_`/`VAL_`/`SIG_VALTYPE_`/`ENVVAR_DATA_` references. With
+  `on_unsupported="skip"`, understood dangling references are omitted and
+  recorded in `parse_diagnostics`; inspect those diagnostics directly for
+  forward-referencing files because the current `cosmetic` classification can
+  be optimistic for `VAL_` and `SIG_VALTYPE_`.
 
 ## Full reference
 

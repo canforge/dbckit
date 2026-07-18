@@ -25,19 +25,21 @@ them to PyPI via [trusted publishing](https://docs.pypi.org/trusted-publishers/)
 (OIDC, GitHub environment `pypi`) — no API tokens are involved.
 
 ```bash
+# Replace X.Y.Z with the release version in every step below.
+
 # 1. Bump version
-#    Edit pyproject.toml: version = "1.0.0"
+#    Edit pyproject.toml: version = "X.Y.Z"
 
 # 2. Update CHANGELOG (see format below)
 
 # 3. Commit the release
 git add pyproject.toml CHANGELOG.md
-git commit -m "chore: release 1.0.0"
+git commit -m "chore: release X.Y.Z"
 git push origin main
 
 # 4. Tag — this triggers the release workflow
-git tag -a v1.0.0 -m "Release 1.0.0"
-git push origin v1.0.0
+git tag -a vX.Y.Z -m "Release X.Y.Z"
+git push origin vX.Y.Z
 
 # 5. Verify
 gh run watch                        # release workflow builds and publishes
@@ -47,7 +49,7 @@ open https://pypi.org/project/dbckit/
 ## CHANGELOG format
 
 ```markdown
-## [1.0.0] — 2026-07-15
+## [X.Y.Z] — YYYY-MM-DD
 
 ### Added
 - ...

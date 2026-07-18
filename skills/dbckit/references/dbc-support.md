@@ -176,12 +176,21 @@ by the parser. Every omission produces an ordered `Database.parse_diagnostics`
 entry with its construct, one-based line, affected message/signal when known,
 effect, and detail. Unknown or unbounded syntax still raises.
 
-Skipped extended-multiplexing semantics are `decode_degraded`. Dangling
-references, comments, transmitter metadata, signal groups, and environment-only
-metadata are `cosmetic` because they remove no decode semantics from a surviving
-message. `Database.decode_safe` and the per-message helpers derive their values
-from these effects. Diagnostics are parse metadata: `dump()` does not serialize
-them and `diff()` ignores them.
+Skipped extended-multiplexing semantics are `decode_degraded`. Other skipped
+dangling references currently receive `cosmetic` diagnostics. Comments,
+transmitter metadata, signal groups, and environment-only metadata do not alter
+signal decoding when their referenced target remains absent.
+
+`Database.decode_safe` and the per-message helpers are rollups of the recorded
+diagnostic effects, not an independent analysis of the surviving model. Because
+references are resolved in source order, a skipped forward `VAL_` or
+`SIG_VALTYPE_` entry can target a message or signal declared later. The current
+parser still records that omission as `cosmetic`, even though it can remove a
+value-table label or float/double interpretation from the surviving signal.
+Consumers of non-canonical, forward-referencing files should therefore inspect
+`parse_diagnostics` directly rather than relying only on `decode_safe`.
+Diagnostics are parse metadata: `dump()` does not serialize them and `diff()`
+ignores them.
 
 - **Determinism:** serializer output is deterministic; section and entry order is stable
   across repeated calls on the same `Database` object.
@@ -194,10 +203,15 @@ them and `diff()` ignores them.
   signal, or environment variable. References are resolved in source order, so the
   referenced object must be declared before the referencing entry. The error
   identifies the section and missing target and is raised as `ValueError`. Skip
-  mode declines the update and records a cosmetic diagnostic; it also diagnoses
-  missing `BO_TX_BU_` and `SIG_GROUP_` targets without changing their legacy
-  strict behavior.
+  mode declines the update and currently records a `cosmetic` diagnostic. For
+  forward `VAL_` and `SIG_VALTYPE_` entries, that classification can be optimistic
+  if the target is declared later; see the decode-safety note above. Skip mode also
+  diagnoses missing `BO_TX_BU_` and `SIG_GROUP_` targets without changing their
+  legacy strict behavior.
 - **Duplicate message IDs in source:** the last `BO_` definition wins (parser overwrites).
 - **Extended frames:** `Message.is_extended_frame` records the DBC bit-31 convention;
-  parsing strips the marker from message definitions and references, while
-  serialization restores it on every section that references the message ID.
+  parsing strips the marker from message definitions and references. For references
+  to an existing message, serialization restores the marker on every section that
+  repeats its ID. A dangling `SIG_GROUP_` has no associated `Message` from which to
+  recover the frame type, so serialization emits its clean ID rather than guessing
+  whether bit 31 should be set.

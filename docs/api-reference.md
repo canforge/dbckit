@@ -1,6 +1,6 @@
 # `dbckit` API Reference
 
-Version covered: `1.0.0`
+Version covered: `1.1.0`
 
 This file documents the public Python API exported by:
 
@@ -182,6 +182,9 @@ Fields:
 - `value_table: ValueTable | None = None`
 - `attributes: dict[str, Any] = {}`
 - `multiplex_indicator: str | None = None`
+- `signal_type: int | None = None` — `SIG_VALTYPE_` override: `1` for a
+  32-bit IEEE-754 float, `2` for a 64-bit IEEE-754 double; `None` or `0` uses
+  the integer codec
 
 Multiplexing contract:
 
@@ -207,6 +210,8 @@ Fields:
 - `arbitration_id: int`
 - `name: str`
 - `length: int`
+- `is_extended_frame: bool = False` — whether DBC serialization applies the
+  bit-31 marker for a 29-bit CAN arbitration ID
 - `senders: list[str] = []`
 - `signals: dict[str, Signal] = {}`
 - `comment: str | None = None`
@@ -834,6 +839,10 @@ Fields:
 - `removed_nodes: list[Node] = []`
 - `added_attributes: list[AttributeDefinition] = []`
 - `removed_attributes: list[AttributeDefinition] = []`
+- `added_signal_groups: list[SignalGroup] = []`
+- `removed_signal_groups: list[SignalGroup] = []`
+- `added_envvars: list[EnvironmentVariable] = []`
+- `removed_envvars: list[EnvironmentVariable] = []`
 
 Property:
 
@@ -848,16 +857,19 @@ Current coverage:
 - added, removed, and modified messages
 - added and removed nodes
 - added and removed attribute definitions
-- per-message field changes for `name`, `length`, `senders`, `comment`, and `cycle_time`
+- added and removed signal groups, keyed by `(message_id, name)`
+- added and removed environment variables, keyed by name
+- per-message field changes for `name`, `length`, `senders`, `comment`,
+  `cycle_time`, and `attributes`
 - per-message added, removed, and modified signals
 
 Not currently covered:
 
 - database-level attribute values
 - node comments or node attributes
-- message attributes
-- signal groups
-- environment variables
+- modifications to an attribute definition that keeps the same name
+- modifications to a signal group that keeps the same `(message_id, name)` key
+- modifications to an environment variable that keeps the same name
 - `dbc_specific`
 
 ### `MergeStrategy`
@@ -976,14 +988,19 @@ Generates one textual artifact from the database.
 Targets:
 
 - `"c"`: C header-style constants and stub decoder functions
-- `"python"`: Python dataclasses and placeholder `decode()` classmethods
+- `"python"`: self-contained Python dataclasses with working `decode()` and
+  `encode()` methods
 - `"markdown"`: human-readable DBC documentation
 - `"json-schema"`: JSON Schema describing per-message payload objects
 
 Important:
 
 - `"c"` output is scaffolding only; generated functions contain `TODO` placeholders
-- `"python"` output is scaffolding only; generated `decode()` methods raise `NotImplementedError`
+- `"python"` output implements Intel/Motorola integer bit extraction and packing,
+  signed conversion, factor/offset scaling, and encode-time clamping. It also emits
+  value-table constants. It does not currently reproduce `SIG_VALTYPE_` IEEE-754
+  semantics or multiplexing behavior; use the runtime codec when those features are
+  required.
 
 Raises:
 
