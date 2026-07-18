@@ -294,6 +294,11 @@ def test_css_electronics_extended_id_fixture_roundtrip():
         update={"filename": None}
     )
     flagged_id = 2364540158
+    extended_id = flagged_id & 0x1FFFFFFF
+    standard_id = 512
+    incorrectly_flagged_standard_id = standard_id | 0x80000000
+
+    assert original.messages[extended_id].cycle_time == 100
 
     serialized = dbckit.dump(original)
 
@@ -302,6 +307,7 @@ def test_css_electronics_extended_id_fixture_roundtrip():
         f"BO_TX_BU_ {flagged_id} :",
         f"CM_ BO_  {flagged_id} ",
         f"CM_ SG_  {flagged_id} EngineSpeed ",
+        f'BA_ "GenMsgCycleTime" BO_ {flagged_id} 100;',
         f'BA_ "VFrameFormat" BO_ {flagged_id} ',
         f'BA_ "SPN" SG_ {flagged_id} EngineSpeed ',
         f"VAL_ {flagged_id} EngineStatus ",
@@ -311,7 +317,17 @@ def test_css_electronics_extended_id_fixture_roundtrip():
     for expected in expected_id_references:
         assert expected in serialized
 
+    expected_standard_id_references = (
+        f"BO_ {standard_id} StandardStatus:",
+        f"CM_ BO_  {standard_id} ",
+        f"VAL_ {standard_id} SystemState ",
+    )
+    for expected in expected_standard_id_references:
+        assert expected in serialized
+    assert str(incorrectly_flagged_standard_id) not in serialized
+
     reparsed = dbckit.parse(serialized)
+    assert reparsed.messages[extended_id].cycle_time == 100
     assert reparsed == original
 
 

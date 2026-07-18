@@ -19,18 +19,25 @@ BO_ 2364540158 EngineTelemetry: 8 EngineECU
  SG_ EngineSpeed : 0|32@1+ (1,0) [0|0] "rpm" Logger
  SG_ EngineStatus : 32|8@1+ (1,0) [0|3] "" Logger
 
+BO_ 512 StandardStatus: 1 Logger
+ SG_ SystemState : 0|8@1+ (1,0) [0|1] "" EngineECU
+
 BO_TX_BU_ 2364540158 : EngineECU,Logger;
 
 CM_ BO_ 2364540158 "Synthetic J1939 engine telemetry";
 CM_ SG_ 2364540158 EngineSpeed "Floating-point engine speed";
+CM_ BO_ 512 "Standard-frame sibling";
 
 BA_DEF_ BO_ "VFrameFormat" ENUM "StandardCAN","ExtendedCAN","reserved","J1939PG";
+BA_DEF_ BO_ "GenMsgCycleTime" INT 0 65535;
 BA_DEF_ SG_ "SPN" INT 0 524287;
 
 BA_ "VFrameFormat" BO_ 2364540158 3;
+BA_ "GenMsgCycleTime" BO_ 2364540158 100;
 BA_ "SPN" SG_ 2364540158 EngineSpeed 190;
 
 VAL_ 2364540158 EngineStatus 3 "NotAvailable" 2 "Error" 1 "On" 0 "Off" ;
+VAL_ 512 SystemState 1 "On" 0 "Off" ;
 
 SIG_GROUP_ 2364540158 EngineSignals 1 : EngineSpeed EngineStatus;
 
