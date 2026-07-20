@@ -9,6 +9,8 @@ Versioning follows [Semantic Versioning](https://semver.org/) from 1.0.0 onward.
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-07-20
+
 ### Changed
 
 - Clarify the known parser and serializer edge cases, including corrected
