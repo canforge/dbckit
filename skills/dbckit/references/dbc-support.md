@@ -178,6 +178,14 @@ ordered `Database.parse_diagnostics` entry with its construct, one-based line,
 affected message/signal when known, effect, and detail. Unknown or unbounded
 syntax still raises.
 
+Strict-mode failures for understood dangling references use the section-specific
+`ValueError` messages described below. Malformed or unknown syntax currently
+raises a subclass of `lark.exceptions.UnexpectedInput`—either `UnexpectedToken`
+or `UnexpectedCharacters`—in both strict and skip modes. Which concrete subclass
+is raised depends on the parser and lexer state, not on a stable distinction
+between malformed and unknown input. Catch `UnexpectedInput` to handle these
+syntax failures; catching `ValueError` alone does not cover every parse failure.
+
 Skipped extended-multiplexing semantics are `decode_degraded`. A skipped
 `VAL_` or `SIG_VALTYPE_` entry is also `decode_degraded` when its referenced
 message and signal exist in the final model. Other skipped dangling references

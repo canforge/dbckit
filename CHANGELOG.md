@@ -9,6 +9,13 @@ Versioning follows [Semantic Versioning](https://semver.org/) from 1.0.0 onward.
 
 ## [Unreleased]
 
+### Changed
+
+- Clarify the known parser and serializer edge cases, including corrected
+  forward-reference and duplicate-message diagnostic behavior and the
+  distinction between section-specific `ValueError` failures and Lark
+  `UnexpectedInput` syntax failures.
+
 ### Fixed
 
 - Record duplicate `BO_` overwrites in skip mode before last-wins parsing drops
