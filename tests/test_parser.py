@@ -25,6 +25,17 @@ FLAGGED_EXTENDED_ID = EXTENDED_ID | 0x80000000
 MISSING_ID = 999
 FLAGGED_MISSING_ID = MISSING_ID | 0x80000000
 
+DUPLICATE_MESSAGE_DBC = """\
+VERSION ""
+NS_ :
+BS_ :
+BU_ : ECU
+BO_ 100 FirstMessage: 8 ECU
+ SG_ FirstSignal : 0|8@1+ (1,0) [0|255] "" ECU
+BO_ 100 ReplacementMessage: 4 ECU
+ SG_ ReplacementSignal : 8|8@1+ (2,1) [1|511] "units" ECU
+"""
+
 
 def test_parse_version():
     db = dbckit.parse('VERSION "1.2.3"\n\nNS_ :\n\nBS_ :\n\nBU_ :\n')
@@ -276,6 +287,99 @@ SG_MUL_VAL_ 100 ExistingSignal ExistingSignal 0-1;
     assert reparsed.parse_diagnostics == []
     assert reparsed.messages == parsed.messages
     assert parsed.diff(reparsed).is_empty
+
+
+def test_skip_duplicate_message_records_degrading_diagnostic_and_keeps_last():
+    db = dbckit.parse(DUPLICATE_MESSAGE_DBC, on_unsupported="skip")
+
+    message = db.messages[100]
+    assert message.name == "ReplacementMessage"
+    assert message.length == 4
+    assert list(message.signals) == ["ReplacementSignal"]
+
+    assert len(db.parse_diagnostics) == 1
+    diagnostic = db.parse_diagnostics[0]
+    assert diagnostic.construct == "BO_"
+    assert diagnostic.line == 7
+    assert diagnostic.message_id == 100
+    assert diagnostic.signal_name is None
+    assert diagnostic.effect == "decode_degraded"
+    assert diagnostic.detail == (
+        "Duplicate BO_ arbitration_id=0x64 at line 7 replaces message "
+        "'FirstMessage' from line 5 with message 'ReplacementMessage'; "
+        "later definition wins"
+    )
+    assert db.decode_safe is False
+    assert db.message_decode_safety == {100: False}
+    assert db.message_decode_safe(100) is False
+
+
+def test_strict_duplicate_message_remains_silent_last_wins():
+    db = dbckit.parse(DUPLICATE_MESSAGE_DBC)
+
+    assert db.messages[100].name == "ReplacementMessage"
+    assert list(db.messages[100].signals) == ["ReplacementSignal"]
+    assert db.parse_diagnostics == []
+
+
+def test_skip_identical_duplicate_message_is_cosmetic():
+    dbc = """\
+VERSION ""
+NS_ :
+BS_ :
+BU_ : ECU
+BO_ 100 SameMessage: 8 ECU
+ SG_ SameSignal : 0|8@1+ (1,0) [0|255] "" ECU
+BO_ 100 SameMessage: 8 ECU
+ SG_ SameSignal : 0|8@1+ (1,0) [0|255] "" ECU
+"""
+
+    db = dbckit.parse(dbc, on_unsupported="skip")
+
+    assert len(db.parse_diagnostics) == 1
+    diagnostic = db.parse_diagnostics[0]
+    assert diagnostic.construct == "BO_"
+    assert diagnostic.line == 7
+    assert diagnostic.message_id == 100
+    assert diagnostic.effect == "cosmetic"
+    assert "'SameMessage' from line 5" in diagnostic.detail
+    assert db.decode_safe is True
+    assert db.message_decode_safety == {100: True}
+    assert db.message_decode_safe(100) is True
+
+
+def test_skip_duplicate_message_detection_uses_normalized_id_and_stays_ordered():
+    flagged_id = 100 | 0x80000000
+    dbc = f"""\
+VERSION ""
+NS_ :
+BS_ :
+BU_ : ECU
+BO_ 100 StandardMessage: 8 ECU
+BO_ {flagged_id} ExtendedMessage: 8 ECU
+BO_ 100 FinalStandardMessage: 8 ECU
+"""
+
+    db = dbckit.parse(dbc, on_unsupported="skip")
+
+    assert list(db.messages) == [100]
+    assert db.messages[100].name == "FinalStandardMessage"
+    assert db.messages[100].is_extended_frame is False
+    assert [diagnostic.construct for diagnostic in db.parse_diagnostics] == [
+        "BO_",
+        "BO_",
+    ]
+    assert [diagnostic.line for diagnostic in db.parse_diagnostics] == [6, 7]
+    assert [diagnostic.message_id for diagnostic in db.parse_diagnostics] == [
+        100,
+        100,
+    ]
+    assert [diagnostic.effect for diagnostic in db.parse_diagnostics] == [
+        "decode_degraded",
+        "decode_degraded",
+    ]
+    assert "'StandardMessage' from line 5" in db.parse_diagnostics[0].detail
+    assert "'ExtendedMessage' from line 6" in db.parse_diagnostics[1].detail
 
 
 def test_skip_refuses_unknown_or_unbounded_syntax():

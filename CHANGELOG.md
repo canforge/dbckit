@@ -11,6 +11,10 @@ Versioning follows [Semantic Versioning](https://semver.org/) from 1.0.0 onward.
 
 ### Fixed
 
+- Record duplicate `BO_` overwrites in skip mode before last-wins parsing drops
+  the earlier source definition, marking differing replacements as
+  `decode_degraded` and identical redefinitions as `cosmetic` while preserving
+  strict-mode compatibility.
 - Mark skipped forward `VAL_` and `SIG_VALTYPE_` references as
   `decode_degraded` when their message and signal exist in the final model, so
   global and per-message decode-safety rollups cannot report a false safe state.

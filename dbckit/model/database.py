@@ -85,7 +85,7 @@ with warnings.catch_warnings():
     )
 
     class ParseDiagnostic(BaseModel):
-        """A construct skipped while parsing a DBC source in lenient mode."""
+        """A skipped construct or source-loss event recorded during DBC parsing."""
 
         construct: str  # type: ignore[assignment]
         line: int

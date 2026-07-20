@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from lark import Lark, Transformer, v_args
 from lark.exceptions import VisitError
@@ -109,6 +109,7 @@ class DBCTransformer(Transformer):
         self._db = Database()
         self._on_unsupported = on_unsupported
         self._diagnostics = diagnostics if diagnostics is not None else []
+        self._message_source_lines: dict[int, int] = {}
 
     def _require_message(
         self,
@@ -191,6 +192,7 @@ class DBCTransformer(Transformer):
         *,
         message_id: int | None = None,
         signal_name: str | None = None,
+        effect: Literal["decode_degraded", "cosmetic"] = "cosmetic",
     ) -> None:
         self._diagnostics.append(
             ParseDiagnostic(
@@ -198,7 +200,7 @@ class DBCTransformer(Transformer):
                 line=line,
                 message_id=message_id,
                 signal_name=signal_name,
-                effect="cosmetic",
+                effect=effect,
                 detail=detail,
             )
         )
@@ -243,6 +245,7 @@ class DBCTransformer(Transformer):
 
     # ── BO_ messages ─────────────────────────────────────────────────────
     def message_section(self, items: list) -> None:
+        line = _line(items)
         arb_id, is_extended = decode_dbc_frame_id(_int(items[0]))
         name = str(items[1])
         dlc = _int(items[2])
@@ -252,7 +255,7 @@ class DBCTransformer(Transformer):
         for item in items[4:]:
             if isinstance(item, Signal):
                 signals[item.name] = item
-        self._db.messages[arb_id] = Message(
+        message = Message(
             arbitration_id=arb_id,
             is_extended_frame=is_extended,
             name=name,
@@ -260,6 +263,26 @@ class DBCTransformer(Transformer):
             senders=senders,
             signals=signals,
         )
+        previous = self._db.messages.get(arb_id)
+        if previous is not None and self._on_unsupported == "skip":
+            previous_line = self._message_source_lines[arb_id]
+            effect: Literal["decode_degraded", "cosmetic"] = (
+                "cosmetic" if previous == message else "decode_degraded"
+            )
+            detail = (
+                f"Duplicate BO_ arbitration_id={arb_id:#x} at line {line} replaces "
+                f"message '{previous.name}' from line {previous_line} with "
+                f"message '{message.name}'; later definition wins"
+            )
+            self._diagnose(
+                "BO_",
+                line,
+                detail,
+                message_id=arb_id,
+                effect=effect,
+            )
+        self._db.messages[arb_id] = message
+        self._message_source_lines[arb_id] = line
 
     def signal_section(self, items: list) -> Signal:
         name = str(items[0])

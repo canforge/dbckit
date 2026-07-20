@@ -180,6 +180,10 @@ Attribute targets: `node:ECU1`, `message:0x1F4`, `signal:0x1F4:Speed`, `""` = da
   recorded in `parse_diagnostics`. A skipped forward `VAL_` or `SIG_VALTYPE_`
   entry is `decode_degraded` when its message and signal exist in the final
   model; references whose targets remain absent are `cosmetic`.
+- Duplicate `BO_` definitions remain last-wins. Skip mode records a diagnostic
+  on the normalized arbitration ID: differing replacements are
+  `decode_degraded`, while identical redefinitions are `cosmetic`. Strict mode
+  remains silent.
 
 ## Full reference
 

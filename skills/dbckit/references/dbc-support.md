@@ -172,16 +172,20 @@ Sender and receiver references are validated by `MISSING_SENDER` and
 `parse()` and `load()` default to `on_unsupported="raise"`, preserving strict
 1.0 behavior. `on_unsupported="skip"` is deliberately narrow: it skips only
 safely bounded extended-multiplexing syntax and dangling references understood
-by the parser. Every omission produces an ordered `Database.parse_diagnostics`
-entry with its construct, one-based line, affected message/signal when known,
-effect, and detail. Unknown or unbounded syntax still raises.
+by the parser, and it diagnoses duplicate `BO_` definitions before applying the
+existing last-wins behavior. Every omission or duplicate overwrite produces an
+ordered `Database.parse_diagnostics` entry with its construct, one-based line,
+affected message/signal when known, effect, and detail. Unknown or unbounded
+syntax still raises.
 
 Skipped extended-multiplexing semantics are `decode_degraded`. A skipped
 `VAL_` or `SIG_VALTYPE_` entry is also `decode_degraded` when its referenced
 message and signal exist in the final model. Other skipped dangling references
 receive `cosmetic` diagnostics. Comments, transmitter metadata, signal groups,
 and environment-only metadata do not alter signal decoding when their
-referenced target remains absent.
+referenced target remains absent. A duplicate `BO_` overwrite is
+`decode_degraded` when the replacement differs from the earlier definition; an
+identical redefinition is `cosmetic`.
 
 `Database.decode_safe` and the per-message helpers are rollups of the recorded
 diagnostic effects, not an independent analysis of the surviving model.
@@ -207,7 +211,12 @@ and `diff()` ignores them.
   entry whose message and signal are declared later is instead marked
   `decode_degraded`. Skip mode also diagnoses missing `BO_TX_BU_` and `SIG_GROUP_`
   targets without changing their legacy strict behavior.
-- **Duplicate message IDs in source:** the last `BO_` definition wins (parser overwrites).
+- **Duplicate message IDs in source:** the last `BO_` definition wins (parser
+  overwrites). Strict mode preserves the legacy silent behavior. Skip mode
+  records a `BO_` diagnostic scoped to the normalized arbitration ID; a differing
+  replacement is `decode_degraded`, while an identical redefinition is
+  `cosmetic`. Parser-produced duplicates cannot reach the validator because the
+  messages dictionary has already retained only the final definition.
 - **Extended frames:** `Message.is_extended_frame` records the DBC bit-31 convention;
   parsing strips the marker from message definitions and references. For references
   to an existing message, serialization restores the marker on every section that

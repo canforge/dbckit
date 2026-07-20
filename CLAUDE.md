@@ -68,6 +68,10 @@ These fail loudly by design — "fixing" them is a roadmap decision, not a bug f
   default and become structured diagnostics in skip mode. Skipped forward
   `VAL_`/`SIG_VALTYPE_` entries are decode-degraded when their final target
   survives; references whose targets remain absent are cosmetic.
+- Duplicate `BO_` definitions remain last-wins in both modes. Skip mode records
+  a diagnostic on the normalized arbitration ID: differing replacements are
+  decode-degraded and identical redefinitions are cosmetic. Strict mode remains
+  silent for compatibility.
 - J1939 lookup helpers read explicit `PGN`/`SPN` attributes; frame-stream decoding
   supports derived-PGN `exact`/`j1939`/attribute-gated `auto` matching.
 - CAN FD untested; `.sym`/`.kcd`/ARXML out of scope.

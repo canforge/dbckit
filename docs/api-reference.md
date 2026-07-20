@@ -132,8 +132,8 @@ Fields:
 
 ### `ParseDiagnostic`
 
-Source metadata recorded when lenient parsing skips an unsupported construct or
-dangling reference.
+Source metadata recorded when lenient parsing skips content or observes a
+duplicate-definition overwrite that can discard source data.
 
 Fields:
 
@@ -246,7 +246,8 @@ Fields:
 - `parse_diagnostics: list[ParseDiagnostic] = []`
 
 `parse_diagnostics` is source metadata. It is not emitted by `dump()` and does
-not participate in semantic database diffing.
+not participate in semantic database diffing. In skip mode, it includes
+duplicate `BO_` overwrites as well as skipped constructs and references.
 
 ### Lenient parsing and decode safety
 
@@ -612,7 +613,8 @@ Behavior:
 - parses the normalized text into a `Database`
 - preserves strict 1.0 behavior when `on_unsupported="raise"`
 - with `on_unsupported="skip"`, isolates only safely bounded unsupported
-  constructs and records ordered `ParseDiagnostic` entries
+  constructs, diagnoses duplicate `BO_` overwrites, and records ordered
+  `ParseDiagnostic` entries
 
 Raises:
 
