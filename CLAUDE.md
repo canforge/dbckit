@@ -72,7 +72,9 @@ These fail loudly by design — "fixing" them is a roadmap decision, not a bug f
   supports derived-PGN `exact`/`j1939`/attribute-gated `auto` matching.
 - CAN FD untested; `.sym`/`.kcd`/ARXML out of scope.
 
-ROADMAP.md is the authority on which of these change in 1.0.1/1.1.0 and how.
+The roadmap lives in Linear (team `dbckit`, reachable via the connected Linear
+MCP); release projects there decide which of these change and when. There is no
+ROADMAP.md — don't go looking for one.
 
 ## Testing conventions
 
